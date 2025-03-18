@@ -369,6 +369,7 @@ int srsran_pmch_decode(srsran_pmch_t*         q,
         qb[i*4 + j] = qb[i*4 + j]*h;
 
 
+//rubens
         // qb[i*4 + j] = qb[i*4 + j] * (q->ce[0][0][i] * conj(q->ce[0][0][i]))*0.0025;
       }
     }*/
