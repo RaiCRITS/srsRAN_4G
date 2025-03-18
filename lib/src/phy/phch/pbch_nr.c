@@ -646,7 +646,7 @@ int srsran_pbch_nr_decode(srsran_pbch_nr_t*           q,
 
   // 7.3.3.2 Modulation
   int8_t llr[PBCH_NR_E];
-  srsran_demod_soft_demodulate_b(SRSRAN_MOD_QPSK, symbols, llr, PBCH_NR_M);
+  srsran_demod_soft_demodulate_b(SRSRAN_MOD_QPSK, symbols, llr, PBCH_NR_M, NULL);
 
   // If all LLR are zero, no message could be received
   if (srsran_vec_avg_power_bf(llr, PBCH_NR_E) == 0) {

@@ -205,7 +205,7 @@ int srsran_pcfich_decode(srsran_pcfich_t*       q,
     }
 
     /* demodulate symbols */
-    srsran_demod_soft_demodulate(SRSRAN_MOD_QPSK, q->d, q->data_f, q->nof_symbols);
+    srsran_demod_soft_demodulate(SRSRAN_MOD_QPSK, q->d, q->data_f, q->nof_symbols, NULL);
 
     /* Scramble with the sequence for slot nslot */
     srsran_scrambling_f(&q->seq[sf_idx], q->data_f);

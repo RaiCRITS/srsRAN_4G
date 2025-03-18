@@ -73,7 +73,7 @@
 
 #ifdef LV_HAVE_SSE
 #include <smmintrin.h>
-void demod_16qam_lte_s_sse(const cf_t* symbols, short* llr, int nsymbols);
+void demod_16qam_lte_s_sse(const cf_t* symbols, short* llr, int nsymbols,const cf_t* ce);
 #endif
 
 #define SCALE_SHORT_CONV_QPSK 100
@@ -122,7 +122,7 @@ void demod_qpsk_lte(const cf_t* symbols, float* llr, int nsymbols)
   srsran_vec_sc_prod_fff((const float*)symbols, -M_SQRT2, llr, nsymbols * 2);
 }
 
-void demod_16qam_lte(const cf_t* symbols, float* llr, int nsymbols)
+void demod_16qam_lte(const cf_t* symbols, float* llr, int nsymbols,const cf_t* ce)
 {
   for (int i = 0; i < nsymbols; i++) {
     float yre = crealf(symbols[i]);
@@ -247,7 +247,7 @@ void demod_16qam_lte_b_neon(const cf_t* symbols, int8_t* llr, int nsymbols)
 
 #ifdef LV_HAVE_SSE
 
-void demod_16qam_lte_s_sse(const cf_t* symbols, short* llr, int nsymbols)
+void demod_16qam_lte_s_sse(const cf_t* symbols, short* llr, int nsymbols,const cf_t* ce)
 {
   float*   symbolsPtr = (float*)symbols;
   __m128i* resultPtr  = (__m128i*)llr;
@@ -264,10 +264,32 @@ void demod_16qam_lte_s_sse(const cf_t* symbols, short* llr, int nsymbols)
   __m128i shuffle_abs_2 = _mm_set_epi8(15, 14, 13, 12, 0xff, 0xff, 0xff, 0xff, 11, 10, 9, 8, 0xff, 0xff, 0xff, 0xff);
 
   for (int i = 0; i < nsymbols / 4; i++) {
+
+
+
     symbol1 = _mm_load_ps(symbolsPtr);
     symbolsPtr += 4;
     symbol2 = _mm_load_ps(symbolsPtr);
     symbolsPtr += 4;
+
+
+
+    //RUBENS.  I also added , " ,cf_t* ce)" to the function ù
+    //ce=channel estimation, cf=complex float, crealf=takes real part of complex,cimagf takes imaginary part
+
+    if (ce != NULL) {
+      //FIX THAT CE IS CALLED FOR i AND NOT FOR i+1 FOR SYMBOL 2
+      //RUBENS
+
+      cf_t h_ce = ce[i];
+      float h_re = crealf(h_ce);
+      float h_im = cimagf(h_ce);
+      float h_abs2 = h_re * h_re + h_im * h_im;
+      symbol1 = _mm_mul_ps(symbol1, _mm_set1_ps(h_abs2)); // multiply the new h2 with symbol
+      symbol2 = _mm_mul_ps(symbol2, _mm_set1_ps(h_abs2));
+      //RUBENS
+    }
+
     symbol_i1 = _mm_cvtps_epi32(_mm_mul_ps(symbol1, scale_v));
     symbol_i2 = _mm_cvtps_epi32(_mm_mul_ps(symbol2, scale_v));
     symbol_i  = _mm_packs_epi32(symbol_i1, symbol_i2);
@@ -288,6 +310,14 @@ void demod_16qam_lte_s_sse(const cf_t* symbols, short* llr, int nsymbols)
   }
   // Demodulate last symbols
   for (int i = 4 * (nsymbols / 4); i < nsymbols; i++) {
+
+    /*if (ce != NULL) {
+      //RUBENS
+      cf_t h_ce = ce[i];
+      float h_abs2 = crealf(h_ce) * crealf(h_ce) + cimagf(h_ce) * cimagf(h_ce);
+      //RUBENS
+    }*/
+
     short yre = (short)(SCALE_SHORT_CONV_QAM16 * crealf(symbols[i]));
     short yim = (short)(SCALE_SHORT_CONV_QAM16 * cimagf(symbols[i]));
 
@@ -360,10 +390,10 @@ void demod_16qam_lte_b_sse(const cf_t* symbols, int8_t* llr, int nsymbols)
 
 #endif
 
-void demod_16qam_lte_s(const cf_t* symbols, short* llr, int nsymbols)
+void demod_16qam_lte_s(const cf_t* symbols, short* llr, int nsymbols,const cf_t* ce)
 {
 #ifdef LV_HAVE_SSE
-  demod_16qam_lte_s_sse(symbols, llr, nsymbols);
+  demod_16qam_lte_s_sse(symbols, llr, nsymbols, ce);
 #else
 #ifdef HAVE_NEONv8
   demod_16qam_lte_s_neon(symbols, llr, nsymbols);
@@ -381,7 +411,7 @@ void demod_16qam_lte_s(const cf_t* symbols, short* llr, int nsymbols)
 #endif
 }
 
-void demod_16qam_lte_b(const cf_t* symbols, int8_t* llr, int nsymbols)
+void demod_16qam_lte_b(const cf_t* symbols, int8_t* llr, int nsymbols,const cf_t* ce)
 {
 #ifdef LV_HAVE_SSE
   demod_16qam_lte_b_sse(symbols, llr, nsymbols);
@@ -843,7 +873,7 @@ void demod_256qam_lte_s(const cf_t* symbols, short* llr, int nsymbols)
   }
 }
 
-int srsran_demod_soft_demodulate(srsran_mod_t modulation, const cf_t* symbols, float* llr, int nsymbols)
+int srsran_demod_soft_demodulate(srsran_mod_t modulation, const cf_t* symbols, float* llr, int nsymbols, const cf_t* ce)
 {
   switch (modulation) {
     case SRSRAN_MOD_BPSK:
@@ -853,7 +883,7 @@ int srsran_demod_soft_demodulate(srsran_mod_t modulation, const cf_t* symbols, f
       demod_qpsk_lte(symbols, llr, nsymbols);
       break;
     case SRSRAN_MOD_16QAM:
-      demod_16qam_lte(symbols, llr, nsymbols);
+      demod_16qam_lte(symbols, llr, nsymbols, ce);
       break;
     case SRSRAN_MOD_64QAM:
       demod_64qam_lte(symbols, llr, nsymbols);
@@ -868,7 +898,7 @@ int srsran_demod_soft_demodulate(srsran_mod_t modulation, const cf_t* symbols, f
   return 0;
 }
 
-int srsran_demod_soft_demodulate_s(srsran_mod_t modulation, const cf_t* symbols, short* llr, int nsymbols)
+int srsran_demod_soft_demodulate_s(srsran_mod_t modulation, const cf_t* symbols, short* llr, int nsymbols, const cf_t* ce)
 {
   switch (modulation) {
     case SRSRAN_MOD_BPSK:
@@ -878,7 +908,7 @@ int srsran_demod_soft_demodulate_s(srsran_mod_t modulation, const cf_t* symbols,
       demod_qpsk_lte_s(symbols, llr, nsymbols);
       break;
     case SRSRAN_MOD_16QAM:
-      demod_16qam_lte_s(symbols, llr, nsymbols);
+      demod_16qam_lte_s(symbols, llr, nsymbols, ce);
       break;
     case SRSRAN_MOD_64QAM:
       demod_64qam_lte_s(symbols, llr, nsymbols);
@@ -893,7 +923,7 @@ int srsran_demod_soft_demodulate_s(srsran_mod_t modulation, const cf_t* symbols,
   return 0;
 }
 
-int srsran_demod_soft_demodulate_b(srsran_mod_t modulation, const cf_t* symbols, int8_t* llr, int nsymbols)
+int srsran_demod_soft_demodulate_b(srsran_mod_t modulation, const cf_t* symbols, int8_t* llr, int nsymbols, const cf_t* ce)
 {
   switch (modulation) {
     case SRSRAN_MOD_BPSK:
@@ -903,7 +933,7 @@ int srsran_demod_soft_demodulate_b(srsran_mod_t modulation, const cf_t* symbols,
       demod_qpsk_lte_b(symbols, llr, nsymbols);
       break;
     case SRSRAN_MOD_16QAM:
-      demod_16qam_lte_b(symbols, llr, nsymbols);
+      demod_16qam_lte_b(symbols, llr, nsymbols, ce);
       break;
     case SRSRAN_MOD_64QAM:
       demod_64qam_lte_b(symbols, llr, nsymbols);

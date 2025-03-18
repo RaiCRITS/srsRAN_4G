@@ -265,7 +265,7 @@ int srsran_pscch_decode(srsran_pscch_t* q, cf_t* equalized_sf_syms, uint8_t* sci
   // 3GPP TS 36.211 version 15.6.0 Release 15 Sec. 9.4.3
 
   // Demodulation
-  srsran_demod_soft_demodulate_s(SRSRAN_MOD_QPSK, q->mod_symbols, q->llr, q->E / SRSRAN_PSCCH_QM);
+  srsran_demod_soft_demodulate_s(SRSRAN_MOD_QPSK, q->mod_symbols, q->llr, q->E / SRSRAN_PSCCH_QM, NULL);
 
   // Descrambling
   srsran_scrambling_s(&q->seq, q->llr);

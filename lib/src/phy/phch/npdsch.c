@@ -447,7 +447,7 @@ int srsran_npdsch_decode_rnti(srsran_npdsch_t*        q,
 #endif
 
     // demodulate symbols
-    srsran_demod_soft_demodulate(SRSRAN_MOD_QPSK, q->d, q->llr, cfg->grant.nof_sf * cfg->nbits.nof_re);
+    srsran_demod_soft_demodulate(SRSRAN_MOD_QPSK, q->d, q->llr, cfg->grant.nof_sf * cfg->nbits.nof_re, NULL);
 
 #if DUMP_SIGNALS
     uint8_t demodbuf[320];

@@ -404,7 +404,7 @@ int srsran_pssch_decode(srsran_pssch_t* q, cf_t* equalized_sf_syms, uint8_t* out
   // 3GPP TS 36.211 version 15.6.0 Release 15 Sec. 9.3.3
 
   // Demodulation
-  srsran_demod_soft_demodulate_s(q->Qm / 2, q->symbols, q->llr, q->G / q->Qm);
+  srsran_demod_soft_demodulate_s(q->Qm / 2, q->symbols, q->llr, q->G / q->Qm, NULL);
 
   // Descramble follows 3GPP TS 36.211 version 15.6.0 Release 15 Sec. 9.3.1
   srsran_sequence_LTE_pr(

@@ -555,7 +555,7 @@ static int decode_signal_format3(srsran_pucch_t*     q,
 
   srsran_vec_sc_prod_cfc(q->d, 2.0f / (N_sf_0 + N_sf_1), q->d, SRSRAN_NRE * 2);
 
-  srsran_demod_soft_demodulate_s(SRSRAN_MOD_QPSK, q->d, q->llr, SRSRAN_PUCCH3_NOF_BITS);
+  srsran_demod_soft_demodulate_s(SRSRAN_MOD_QPSK, q->d, q->llr, SRSRAN_PUCCH3_NOF_BITS, NULL);
 
   if (srsran_sequence_pucch(&q->seq_f2, cfg->rnti, 2 * (sf->tti % 10), q->cell.id)) {
     ERROR("Error computing PUCCH Format 2 scrambling sequence\n");
@@ -699,7 +699,7 @@ static bool decode_signal(srsran_pucch_t*     q,
       for (int i = 0; i < (SRSRAN_PUCCH2_N_SF * SRSRAN_NOF_SLOTS_PER_SF); i++) {
         q->z[i] = srsran_vec_acc_cc(&q->z_tmp[i * SRSRAN_NRE], SRSRAN_NRE) / SRSRAN_NRE;
       }
-      srsran_demod_soft_demodulate_s(SRSRAN_MOD_QPSK, q->z, llr_pucch2, SRSRAN_PUCCH2_NOF_BITS / 2);
+      srsran_demod_soft_demodulate_s(SRSRAN_MOD_QPSK, q->z, llr_pucch2, SRSRAN_PUCCH2_NOF_BITS / 2, NULL);
       srsran_scrambling_s_offset(&q->seq_f2, llr_pucch2, 0, SRSRAN_PUCCH2_NOF_BITS);
 
       // Calculate the LLR RMS for normalising

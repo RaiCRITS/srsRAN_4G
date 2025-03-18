@@ -589,7 +589,7 @@ int srsran_pucch_nr_format1_decode(srsran_pucch_nr_t*                  q,
 
   // Demodulate d
   float llr[SRSRAN_PUCCH_NR_FORMAT1_MAX_NOF_BITS];
-  srsran_demod_soft_demodulate((nof_bits == 1) ? SRSRAN_MOD_BPSK : SRSRAN_MOD_QPSK, &d, llr, 1);
+  srsran_demod_soft_demodulate((nof_bits == 1) ? SRSRAN_MOD_BPSK : SRSRAN_MOD_QPSK, &d, llr, 1, NULL);
 
   // Hard decision based on the LLRs sign
   for (uint32_t i = 0; i < nof_bits; i++) {
@@ -720,7 +720,7 @@ static int pucch_nr_format2_decode(srsran_pucch_nr_t*                  q,
   }
 
   // Soft-demodulate
-  if (srsran_demod_soft_demodulate_b(SRSRAN_MOD_QPSK, q->d, llr, E / 2) < SRSRAN_SUCCESS) {
+  if (srsran_demod_soft_demodulate_b(SRSRAN_MOD_QPSK, q->d, llr, E / 2, NULL) < SRSRAN_SUCCESS) {
     ERROR("Error soft-demodulate");
     return SRSRAN_ERROR;
   }

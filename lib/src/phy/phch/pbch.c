@@ -545,7 +545,7 @@ int srsran_pbch_decode(srsran_pbch_t*         q,
         }
 
         /* demodulate symbols */
-        srsran_demod_soft_demodulate(SRSRAN_MOD_QPSK, q->d, &q->llr[nof_bits * (frame_idx - 1)], q->nof_symbols);
+        srsran_demod_soft_demodulate(SRSRAN_MOD_QPSK, q->d, &q->llr[nof_bits * (frame_idx - 1)], q->nof_symbols, NULL);
 
         /* We don't know where the 40 ms begin, so we try all combinations. E.g. if we received
          * 4 frames, try 1,2,3,4 individually, 12, 23, 34 in pairs, 123, 234 and finally 1234.

@@ -182,7 +182,7 @@ int main(int argc, char** argv)
     srsran_mod_modulate(&mod, input, symbols, num_bits);
 
     gettimeofday(&t[1], NULL);
-    srsran_demod_soft_demodulate(modulation, symbols, llr, num_bits / mod.nbits_x_symbol);
+    srsran_demod_soft_demodulate(modulation, symbols, llr, num_bits / mod.nbits_x_symbol, NULL);
     gettimeofday(&t[2], NULL);
     get_time_interval(t);
 
@@ -192,7 +192,7 @@ int main(int argc, char** argv)
     }
 
     gettimeofday(&t[1], NULL);
-    srsran_demod_soft_demodulate_s(modulation, symbols, llr_s, num_bits / mod.nbits_x_symbol);
+    srsran_demod_soft_demodulate_s(modulation, symbols, llr_s, num_bits / mod.nbits_x_symbol, NULL);
     gettimeofday(&t[2], NULL);
     get_time_interval(t);
 
@@ -201,7 +201,7 @@ int main(int argc, char** argv)
     }
 
     gettimeofday(&t[1], NULL);
-    srsran_demod_soft_demodulate_b(modulation, symbols, llr_b, num_bits / mod.nbits_x_symbol);
+    srsran_demod_soft_demodulate_b(modulation, symbols, llr_b, num_bits / mod.nbits_x_symbol, NULL);
     gettimeofday(&t[2], NULL);
     get_time_interval(t);
 

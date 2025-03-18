@@ -387,7 +387,7 @@ int srsran_npdcch_extract_llr(srsran_npdcch_t* q,
 #endif
 
       // demodulate symbols
-      srsran_demod_soft_demodulate(SRSRAN_MOD_QPSK, q->d, llr, num_symbols);
+      srsran_demod_soft_demodulate(SRSRAN_MOD_QPSK, q->d, llr, num_symbols, NULL);
 
       // descramble
       srsran_scrambling_f_offset(&q->seq[sf_idx], llr, 0, e_bits);

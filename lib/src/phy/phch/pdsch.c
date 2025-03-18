@@ -698,9 +698,9 @@ static int srsran_pdsch_codeword_decode(srsran_pdsch_t*     q,
      * thus we don't need tot set it in the LLRs normalization
      */
     if (q->llr_is_8bit) {
-      srsran_demod_soft_demodulate_b(mcs->mod, q->d[codeword_idx], q->e[codeword_idx], cfg->grant.nof_re);
+      srsran_demod_soft_demodulate_b(mcs->mod, q->d[codeword_idx], q->e[codeword_idx], cfg->grant.nof_re, NULL);
     } else {
-      srsran_demod_soft_demodulate_s(mcs->mod, q->d[codeword_idx], q->e[codeword_idx], cfg->grant.nof_re);
+      srsran_demod_soft_demodulate_s(mcs->mod, q->d[codeword_idx], q->e[codeword_idx], cfg->grant.nof_re, NULL);
     }
     if (cfg->meas_evm_en && q->evm_buffer[codeword_idx]) {
       if (q->llr_is_8bit) {

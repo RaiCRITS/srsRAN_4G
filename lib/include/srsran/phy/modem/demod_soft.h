@@ -36,10 +36,10 @@
 #include "modem_table.h"
 #include "srsran/config.h"
 
-SRSRAN_API int srsran_demod_soft_demodulate(srsran_mod_t modulation, const cf_t* symbols, float* llr, int nsymbols);
+SRSRAN_API int srsran_demod_soft_demodulate(srsran_mod_t modulation, const cf_t* symbols, float* llr, int nsymbols,  const cf_t* ce);
 
-SRSRAN_API int srsran_demod_soft_demodulate_s(srsran_mod_t modulation, const cf_t* symbols, short* llr, int nsymbols);
+SRSRAN_API int srsran_demod_soft_demodulate_s(srsran_mod_t modulation, const cf_t* symbols, short* llr, int nsymbols,  const cf_t* ce);
 
-SRSRAN_API int srsran_demod_soft_demodulate_b(srsran_mod_t modulation, const cf_t* symbols, int8_t* llr, int nsymbols);
+SRSRAN_API int srsran_demod_soft_demodulate_b(srsran_mod_t modulation, const cf_t* symbols, int8_t* llr, int nsymbols ,  const cf_t* ce);
 
 #endif // SRSRAN_DEMOD_SOFT_H

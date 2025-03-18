@@ -180,7 +180,7 @@ int main(int argc, char** argv)
   printf("Symbols OK\n");
   /* demodulate */
   gettimeofday(&x, NULL);
-  srsran_demod_soft_demodulate(modulation, symbols, llr, num_bits / mod.nbits_x_symbol);
+  srsran_demod_soft_demodulate(modulation, symbols, llr, num_bits / mod.nbits_x_symbol, NULL);
   gettimeofday(&y, NULL);
   printf("\nElapsed time [us]: %ld\n", y.tv_usec - x.tv_usec);
   for (i = 0; i < num_bits; i++) {

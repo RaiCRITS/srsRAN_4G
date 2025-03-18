@@ -464,7 +464,7 @@ int srsran_npbch_decode_nf(srsran_npbch_t* q,
         }
 
         // demodulate symbols
-        srsran_demod_soft_demodulate(SRSRAN_MOD_QPSK, q->d, &q->llr[nof_bits * (q->frame_idx - 1)], q->nof_symbols);
+        srsran_demod_soft_demodulate(SRSRAN_MOD_QPSK, q->d, &q->llr[nof_bits * (q->frame_idx - 1)], q->nof_symbols, NULL);
 
         // only one subframe
         DEBUG("Trying to decode NPBCH ..");

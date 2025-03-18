@@ -417,9 +417,9 @@ int srsran_pusch_decode(srsran_pusch_t*        q,
 
     // Soft demodulation
     if (q->llr_is_8bit) {
-      srsran_demod_soft_demodulate_b(cfg->grant.tb.mod, q->d, q->q, cfg->grant.nof_re);
+      srsran_demod_soft_demodulate_b(cfg->grant.tb.mod, q->d, q->q, cfg->grant.nof_re, NULL);
     } else {
-      srsran_demod_soft_demodulate_s(cfg->grant.tb.mod, q->d, q->q, cfg->grant.nof_re);
+      srsran_demod_soft_demodulate_s(cfg->grant.tb.mod, q->d, q->q, cfg->grant.nof_re, NULL);
     }
 
     if (cfg->meas_evm_en && q->evm_buffer) {

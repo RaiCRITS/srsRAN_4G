@@ -297,7 +297,7 @@ int srsran_phich_decode(srsran_phich_t*         q,
   if (SRSRAN_VERBOSE_ISDEBUG())
     srsran_vec_fprint_c(stdout, q->z, SRSRAN_PHICH_NBITS);
 
-  srsran_demod_soft_demodulate(SRSRAN_MOD_BPSK, q->z, q->data_rx, SRSRAN_PHICH_NBITS);
+  srsran_demod_soft_demodulate(SRSRAN_MOD_BPSK, q->z, q->data_rx, SRSRAN_PHICH_NBITS, NULL);
 
   if (result) {
     result->ack_value = srsran_phich_ack_decode(q->data_rx, &result->distance);

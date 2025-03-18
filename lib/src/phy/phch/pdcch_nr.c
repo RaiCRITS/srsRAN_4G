@@ -625,7 +625,7 @@ int srsran_pdcch_nr_decode(srsran_pdcch_nr_t*      q,
 
   // Demodulation
   int8_t* llr = (int8_t*)q->f;
-  srsran_demod_soft_demodulate_b(SRSRAN_MOD_QPSK, q->symbols, llr, q->M);
+  srsran_demod_soft_demodulate_b(SRSRAN_MOD_QPSK, q->symbols, llr, q->M, NULL);
 
   // Measure EVM if configured
   if (q->evm_buffer != NULL) {
