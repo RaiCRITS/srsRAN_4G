@@ -336,7 +336,7 @@ int srsran_pmch_decode(srsran_pmch_t*         q,
                                     1.0f,
                                     1.0f /*channel->noise_estimate*/);
 
-//    if (SRSRAN_VERBOSE_ISDEBUG())
+    if (SRSRAN_VERBOSE_ISDEBUG())
       {
       DEBUG("SAVED FILE subframe.dat: received subframe symbols");
       srsran_vec_save_file("subframe2.dat", q->symbols[0], cfg->pdsch_cfg.grant.nof_re * sizeof(cf_t));

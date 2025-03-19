@@ -263,8 +263,12 @@ void demod_16qam_lte_s_sse(const cf_t* symbols, short* llr, int nsymbols,const c
       _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 15, 14, 13, 12, 0xff, 0xff, 0xff, 0xff, 11, 10, 9, 8);
   __m128i shuffle_abs_2 = _mm_set_epi8(15, 14, 13, 12, 0xff, 0xff, 0xff, 0xff, 11, 10, 9, 8, 0xff, 0xff, 0xff, 0xff);
 
-  for (int i = 0; i < nsymbols / 4; i++) {
 
+
+   //NSYMBOLS ALLWAYS 3000
+
+
+  for (int i = 0; i < nsymbols / 4; i++) {
 
 
     symbol1 = _mm_load_ps(symbolsPtr);
@@ -274,21 +278,31 @@ void demod_16qam_lte_s_sse(const cf_t* symbols, short* llr, int nsymbols,const c
 
 
 
-    //RUBENS.  I also added , " ,cf_t* ce)" to the function ù
-    //ce=channel estimation, cf=complex float, crealf=takes real part of complex,cimagf takes imaginary part
+    printf("DEBUG: symbol1 = (%f), (%f)\n",  symbol1[0],symbol1[1]);
+    printf("DEBUG: symbols = (%f), (%f)\n",  crealf(symbols[4*i]),cimagf(symbols[4*i]));
 
-    if (ce != NULL) {
-      //FIX THAT CE IS CALLED FOR i AND NOT FOR i+1 FOR SYMBOL 2
-      //RUBENS
 
-      cf_t h_ce = ce[i];
-      float h_re = crealf(h_ce);
-      float h_im = cimagf(h_ce);
-      float h_abs2 = h_re * h_re + h_im * h_im;
-      symbol1 = _mm_mul_ps(symbol1, _mm_set1_ps(h_abs2)); // multiply the new h2 with symbol
-      symbol2 = _mm_mul_ps(symbol2, _mm_set1_ps(h_abs2));
-      //RUBENS
-    }
+
+    //FIX THAT CE IS CALLED FOR i AND NOT FOR i+1 FOR SYMBOL 2
+
+    //RUBENS
+
+    // if (ce != NULL) {
+    //
+    //   //printf("DEBUG: ce[%d] = (%f, %f)\n", i, crealf(ce[i]), cimagf(ce[i]));
+    //   // printf("DEBUG: symbol1 = (%f), (%f), (%f), (%f)\n",  symbol1[0],symbol1[1],symbol1[2],symbol1[3]);
+    //   // printf("DEBUG: symbol2 = (%f), (%f), (%f), (%f)\n",  symbol2[0],symbol2[1],symbol2[2],symbol2[3]);
+    //
+    //   cf_t h_ce = ce[8*i];
+    //   float h_re = crealf(h_ce);
+    //   float h_im = cimagf(h_ce);
+    //   float h_abs2 = h_re * h_re + h_im * h_im;
+    //   symbol1 = _mm_mul_ps(symbol1, _mm_set1_ps(h_abs2));
+    //   symbol2 = _mm_mul_ps(symbol2, _mm_set1_ps(h_abs2));
+    //
+    //
+    // }
+    //RUBENS
 
     symbol_i1 = _mm_cvtps_epi32(_mm_mul_ps(symbol1, scale_v));
     symbol_i2 = _mm_cvtps_epi32(_mm_mul_ps(symbol2, scale_v));
