@@ -334,18 +334,19 @@ int srsran_pmch_decode(srsran_pmch_t*         q,
                                     q->nof_rx_antennas,
                                     cfg->pdsch_cfg.grant.nof_re,
                                     1.0f,
-                                    1.0f /*channel->noise_estimate*/);
+                                    //1.0f);
+                                    channel->noise_estimate);
 
-    if (SRSRAN_VERBOSE_ISDEBUG())
+    if (true)
       {
       DEBUG("SAVED FILE subframe.dat: received subframe symbols");
       srsran_vec_save_file("subframe2.dat", q->symbols[0], cfg->pdsch_cfg.grant.nof_re * sizeof(cf_t));
       DEBUG("SAVED FILE hest0.dat: channel estimates for port 4");
-      printf("nof_prb=%d, cp=%d, nof_re=%d, grant_re=%d\n",
-             q->cell.nof_prb,
-             q->cell.cp,
-             SRSRAN_NOF_RE(q->cell),
-             cfg->pdsch_cfg.grant.nof_re);
+      //printf("nof_prb=%d, cp=%d, nof_re=%d, grant_re=%d\n",
+             // q->cell.nof_prb,
+             // q->cell.cp,
+             // SRSRAN_NOF_RE(q->cell),
+             // cfg->pdsch_cfg.grant.nof_re);
       srsran_vec_save_file("hest2.dat", channel->ce[0][0], SRSRAN_NOF_RE(q->cell) * sizeof(cf_t));
       DEBUG("SAVED FILE pmch_symbols.dat: symbols after equalization");
       srsran_vec_save_file("pmch_symbols.bin", q->d, cfg->pdsch_cfg.grant.nof_re * sizeof(cf_t));
@@ -358,28 +359,26 @@ int srsran_pmch_decode(srsran_pmch_t*         q,
     srsran_demod_soft_demodulate_s(cfg->pdsch_cfg.grant.tb[0].mod, q->d, q->e, cfg->pdsch_cfg.grant.nof_re, q->ce[0][0]);
 
   // - modified ALC commented because inputed in the demod soft.h function
-  
-    /*
-    short *qb = q->e;
-    for (int i = 0; i < cfg->pdsch_cfg.grant.nof_re; i++) {
-      for (int j = 0; j < 4; j++){
-        float h;
-        //h = cabsf(q->ce[0][0][i])*0.05; //divide per 20 
-        h = (q->ce[0][0][i] * conj(q->ce[0][0][i]))*0.0025;
-        qb[i*4 + j] = qb[i*4 + j]*h;
 
-
-//rubens
-        // qb[i*4 + j] = qb[i*4 + j] * (q->ce[0][0][i] * conj(q->ce[0][0][i]))*0.0025;
-      }
-    }*/
+//     short *qb = q->e;
+//     for (int i = 0; i < cfg->pdsch_cfg.grant.nof_re; i++) {
+//       for (int j = 0; j < 4; j++){
+//         float h;
+//         h = (q->ce[0][0][i] * conj(q->ce[0][0][i]))*0.0025;
+//         qb[i*4 + j] = qb[i*4 + j]*h;
+//         // printf("%f \n", h);
+// //rubens
+//         // qb[i*4 + j] = qb[i*4 + j] * (q->ce[0][0][i] * conj(q->ce[0][0][i]))*0.0025;
+//       }
+//     }
   
   // - modified ALC
 
     /* descramble */
     srsran_scrambling_s_offset(&q->seqs[cfg->area_id]->seq[sf->tti % 10], q->e, 0, cfg->pdsch_cfg.grant.tb[0].nof_bits);
 
-    if (SRSRAN_VERBOSE_ISDEBUG()) {
+
+    if (true) {
       DEBUG("SAVED FILE llr.dat: LLR estimates after demodulation and descrambling");
       srsran_vec_save_file("llr.dat", q->e, cfg->pdsch_cfg.grant.tb[0].nof_bits * sizeof(int16_t));
     }

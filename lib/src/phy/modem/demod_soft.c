@@ -249,97 +249,124 @@ void demod_16qam_lte_b_neon(const cf_t* symbols, int8_t* llr, int nsymbols)
 
 void demod_16qam_lte_s_sse(const cf_t* symbols, short* llr, int nsymbols,const cf_t* ce)
 {
-  float*   symbolsPtr = (float*)symbols;
-  __m128i* resultPtr  = (__m128i*)llr;
-  __m128   symbol1, symbol2;
-  __m128i  symbol_i1, symbol_i2, symbol_i, symbol_abs;
-  __m128i  offset = _mm_set1_epi16(2 * SCALE_SHORT_CONV_QAM16 / sqrtf(10));
-  __m128i  result11, result12, result22, result21;
-  __m128   scale_v           = _mm_set1_ps(-SCALE_SHORT_CONV_QAM16);
-  __m128i  shuffle_negated_1 = _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 7, 6, 5, 4, 0xff, 0xff, 0xff, 0xff, 3, 2, 1, 0);
+   float*   symbolsPtr = (float*)symbols;
+   __m128i* resultPtr  = (__m128i*)llr;
+   __m128   symbol1, symbol2;
+   __m128i  symbol_i1, symbol_i2, symbol_i, symbol_abs;
+   __m128 offset = _mm_set1_ps(2 * SCALE_SHORT_CONV_QAM16 / sqrtf(10));
+    // __m128i  offset = _mm_set1_epi16(2 * SCALE_SHORT_CONV_QAM16 / sqrtf(10));
+
+   __m128i  result11, result12, result22, result21;
+   __m128   scale_v           = _mm_set1_ps(-SCALE_SHORT_CONV_QAM16);
+   __m128i  shuffle_negated_1 = _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 7, 6, 5, 4, 0xff, 0xff, 0xff, 0xff, 3, 2, 1, 0);
+
   __m128i  shuffle_abs_1     = _mm_set_epi8(7, 6, 5, 4, 0xff, 0xff, 0xff, 0xff, 3, 2, 1, 0, 0xff, 0xff, 0xff, 0xff);
 
-  __m128i shuffle_negated_2 =
-      _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 15, 14, 13, 12, 0xff, 0xff, 0xff, 0xff, 11, 10, 9, 8);
-  __m128i shuffle_abs_2 = _mm_set_epi8(15, 14, 13, 12, 0xff, 0xff, 0xff, 0xff, 11, 10, 9, 8, 0xff, 0xff, 0xff, 0xff);
+   __m128i shuffle_negated_2 =
+       _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 15, 14, 13, 12, 0xff, 0xff, 0xff, 0xff, 11, 10, 9, 8);
+   __m128i shuffle_abs_2 = _mm_set_epi8(15, 14, 13, 12, 0xff, 0xff, 0xff, 0xff, 11, 10, 9, 8, 0xff, 0xff, 0xff, 0xff);
+
+   //RUBENS
+   float*   cePtr = (float*)ce;
+   __m128   ce1, ce2, ce2_fin, ce1_fin;
+  __m128 ce1_shuffled, ce2_shuffled;
+  __m128i  offsetnew;
+  __m128i  offsetnew1, offsetnew2;
+   __m128   norm = _mm_set1_ps(0.0025);
+
+  // RUBENS
+   for (int i = 0; i < nsymbols / 4; i++) {
+
+     symbol1 = _mm_load_ps(symbolsPtr);
+     symbolsPtr += 4;
+     symbol2 = _mm_load_ps(symbolsPtr);
+     symbolsPtr += 4;
+     //RUBENS
+     ce1 = _mm_load_ps(cePtr);
+     cePtr += 4;
+     ce2 = _mm_load_ps(cePtr);
+     cePtr += 4;
+     //RUBENS
+
+     // IMPORTANT PROOF THAT CE HAS 1 COMPLEX ELEMENT FOR EACH SYMBOL IN THIS CASE CE 1 THAT IS 4i+5 IS THE SAME AS 4i
+     // printf("DEBUG: CE 1= (%f), (%f)\n",  crealf(ce[4*i]),cimagf(ce[4*i]));
+     // printf("DEBUG: CE 2= (%f), (%f)\n",  crealf(ce[4*i+1]),cimagf(ce[4*i+1]));
+     // printf("DEBUG: CE 3= (%f), (%f)\n",  crealf(ce[4*i+2]),cimagf(ce[4*i+2]));
+     // printf("DEBUG: CE 4= (%f), (%f)\n",  crealf(ce[4*i+3]),cimagf(ce[4*i+3]));
+
+     //IMPORTANT PROOF FOR SYMBOL1 2 AND SYMBOLS HOW COMPLEX FLOATS ARE CONSIDERED
+     // printf("DEBUG: symbol1 = (%f), (%f)\n",  symbol1[0],symbol1[1]);
+     // printf("DEBUG: symbols = (%f), (%f)\n",  crealf(symbols[4*i]),cimagf(symbols[4*i]));
+
+     ce1 = _mm_mul_ps(ce1, ce1);
+     ce1 = _mm_mul_ps(ce1, norm);
+     ce2 = _mm_mul_ps(ce2, ce2);
+     ce2 = _mm_mul_ps(ce2, norm);
+
+
+     ce1_shuffled = _mm_shuffle_ps(ce1, ce1, _MM_SHUFFLE(0, 1, 2, 3));
+     ce1_fin = _mm_add_ps(ce1_shuffled, ce1);
+     ce2_shuffled = _mm_shuffle_ps(ce2, ce2, _MM_SHUFFLE(0, 1, 2, 3));
+     ce2_fin = _mm_add_ps(ce2_shuffled, ce2);
 
 
 
-   //NSYMBOLS ALLWAYS 3000
+
+     symbol1 =_mm_mul_ps(symbol1, ce1_fin);
+     symbol2 =_mm_mul_ps(symbol2, ce2_fin);
 
 
-  for (int i = 0; i < nsymbols / 4; i++) {
+     //RUBENS OFFSET
+     offsetnew1 = _mm_cvtps_epi32(_mm_mul_ps(offset, ce1_fin));
+     offsetnew2 = _mm_cvtps_epi32(_mm_mul_ps(offset, ce2_fin));
+     offsetnew = _mm_packs_epi32(offsetnew1, offsetnew2);
+     //RUBENS
+     // ORIGINAL
+     symbol_i1 = _mm_cvtps_epi32(_mm_mul_ps(symbol1, scale_v));
+     symbol_i2 = _mm_cvtps_epi32(_mm_mul_ps(symbol2, scale_v));
+     symbol_i  = _mm_packs_epi32(symbol_i1, symbol_i2);
+     symbol_abs = _mm_abs_epi16(symbol_i);
+     symbol_abs = _mm_sub_epi16(symbol_abs, offsetnew);
+     //original
 
 
-    symbol1 = _mm_load_ps(symbolsPtr);
-    symbolsPtr += 4;
-    symbol2 = _mm_load_ps(symbolsPtr);
-    symbolsPtr += 4;
+     result11 = _mm_shuffle_epi8(symbol_i, shuffle_negated_1);
+     result12 = _mm_shuffle_epi8(symbol_abs, shuffle_abs_1);
+     result21 = _mm_shuffle_epi8(symbol_i, shuffle_negated_2);
+     result22 = _mm_shuffle_epi8(symbol_abs, shuffle_abs_2);
 
+     _mm_store_si128(resultPtr, _mm_or_si128(result11, result12));
+     resultPtr++;
 
+     _mm_store_si128(resultPtr, _mm_or_si128(result21, result22));
+     resultPtr++;
+   }
 
-    printf("DEBUG: symbol1 = (%f), (%f)\n",  symbol1[0],symbol1[1]);
-    printf("DEBUG: symbols = (%f), (%f)\n",  crealf(symbols[4*i]),cimagf(symbols[4*i]));
-
-
-
-    //FIX THAT CE IS CALLED FOR i AND NOT FOR i+1 FOR SYMBOL 2
-
-    //RUBENS
-
-    // if (ce != NULL) {
-    //
-    //   //printf("DEBUG: ce[%d] = (%f, %f)\n", i, crealf(ce[i]), cimagf(ce[i]));
-    //   // printf("DEBUG: symbol1 = (%f), (%f), (%f), (%f)\n",  symbol1[0],symbol1[1],symbol1[2],symbol1[3]);
-    //   // printf("DEBUG: symbol2 = (%f), (%f), (%f), (%f)\n",  symbol2[0],symbol2[1],symbol2[2],symbol2[3]);
-    //
-    //   cf_t h_ce = ce[8*i];
-    //   float h_re = crealf(h_ce);
-    //   float h_im = cimagf(h_ce);
-    //   float h_abs2 = h_re * h_re + h_im * h_im;
-    //   symbol1 = _mm_mul_ps(symbol1, _mm_set1_ps(h_abs2));
-    //   symbol2 = _mm_mul_ps(symbol2, _mm_set1_ps(h_abs2));
-    //
-    //
-    // }
-    //RUBENS
-
-    symbol_i1 = _mm_cvtps_epi32(_mm_mul_ps(symbol1, scale_v));
-    symbol_i2 = _mm_cvtps_epi32(_mm_mul_ps(symbol2, scale_v));
-    symbol_i  = _mm_packs_epi32(symbol_i1, symbol_i2);
-
-    symbol_abs = _mm_abs_epi16(symbol_i);
-    symbol_abs = _mm_sub_epi16(symbol_abs, offset);
-
-    result11 = _mm_shuffle_epi8(symbol_i, shuffle_negated_1);
-    result12 = _mm_shuffle_epi8(symbol_abs, shuffle_abs_1);
-
-    result21 = _mm_shuffle_epi8(symbol_i, shuffle_negated_2);
-    result22 = _mm_shuffle_epi8(symbol_abs, shuffle_abs_2);
-
-    _mm_store_si128(resultPtr, _mm_or_si128(result11, result12));
-    resultPtr++;
-    _mm_store_si128(resultPtr, _mm_or_si128(result21, result22));
-    resultPtr++;
-  }
   // Demodulate last symbols
+
+
   for (int i = 4 * (nsymbols / 4); i < nsymbols; i++) {
-
-    /*if (ce != NULL) {
-      //RUBENS
-      cf_t h_ce = ce[i];
-      float h_abs2 = crealf(h_ce) * crealf(h_ce) + cimagf(h_ce) * cimagf(h_ce);
-      //RUBENS
-    }*/
-
     short yre = (short)(SCALE_SHORT_CONV_QAM16 * crealf(symbols[i]));
     short yim = (short)(SCALE_SHORT_CONV_QAM16 * cimagf(symbols[i]));
 
-    llr[4 * i + 0] = -yre;
-    llr[4 * i + 1] = -yim;
-    llr[4 * i + 2] = abs(yre) - 2 * SCALE_SHORT_CONV_QAM16 / sqrtf(10);
-    llr[4 * i + 3] = abs(yim) - 2 * SCALE_SHORT_CONV_QAM16 / sqrtf(10);
+
+    //RUBENS
+    short ce_mag = (short)(ce[i]*conj(ce[i]))*0.0025;
+    llr[4 * i + 0] = -yre*ce_mag;
+    llr[4 * i + 1] = -yim*ce_mag;
+    llr[4 * i + 2] = (abs(yre) - 2 * SCALE_SHORT_CONV_QAM16 / sqrtf(10))*ce_mag;
+    llr[4 * i + 3] = (abs(yim) - 2 * SCALE_SHORT_CONV_QAM16 / sqrtf(10))*ce_mag;
+    //RUBENS
+
+    //ORIGINAL
+    // llr[4 * i + 0] = -yre;
+    // llr[4 * i + 1] = -yim;
+    // llr[4 * i + 2] = (abs(yre) - 2 * SCALE_SHORT_CONV_QAM16 / sqrtf(10));
+    // llr[4 * i + 3] = (abs(yim) - 2 * SCALE_SHORT_CONV_QAM16 / sqrtf(10));
+    //ORIGINAL
+
   }
+
 }
 
 void demod_16qam_lte_b_sse(const cf_t* symbols, int8_t* llr, int nsymbols)
@@ -360,6 +387,7 @@ void demod_16qam_lte_b_sse(const cf_t* symbols, int8_t* llr, int nsymbols)
   __m128i shuffle_abs_2 = _mm_set_epi8(15, 14, 0xff, 0xff, 13, 12, 0xff, 0xff, 11, 10, 0xff, 0xff, 9, 8, 0xff, 0xff);
 
   for (int i = 0; i < nsymbols / 8; i++) {
+
     symbol1 = _mm_load_ps(symbolsPtr);
     symbolsPtr += 4;
     symbol2 = _mm_load_ps(symbolsPtr);
@@ -663,6 +691,7 @@ static void demod_64qam_lte_s_sse(const cf_t* symbols, int16_t* llr, int nsymbol
     result31 = _mm_shuffle_epi8(symbol_i, shuffle_negated_3);
     result32 = _mm_shuffle_epi8(symbol_abs, shuffle_abs_3);
     result33 = _mm_shuffle_epi8(symbol_abs2, shuffle_abs2_3);
+
 
     _mm_store_si128(resultPtr, _mm_or_si128(_mm_or_si128(result11, result12), result13));
     resultPtr++;
