@@ -303,14 +303,14 @@ void demod_16qam_lte_s_sse(const cf_t* symbols, short* llr, int nsymbols,const c
      ce2 = _mm_mul_ps(ce2, ce2);
      ce2 = _mm_mul_ps(ce2, norm);
 
-
-     ce1_shuffled = _mm_shuffle_ps(ce1, ce1, _MM_SHUFFLE(0, 1, 2, 3));
+     ce1_shuffled = _mm_shuffle_ps(ce1, ce1, _MM_SHUFFLE(2, 3, 0, 1));
      ce1_fin = _mm_add_ps(ce1_shuffled, ce1);
-     ce2_shuffled = _mm_shuffle_ps(ce2, ce2, _MM_SHUFFLE(0, 1, 2, 3));
+     ce2_shuffled = _mm_shuffle_ps(ce2, ce2, _MM_SHUFFLE(2, 3, 0, 1));
      ce2_fin = _mm_add_ps(ce2_shuffled, ce2);
 
-
-
+     // printf("DEBUG: ce1          = (%f), (%f), (%f), (%f)\n",  ce1[0],ce1[1],ce1[2],ce1[3]);
+     // printf("DEBUG: ce1 shuffled = (%f), (%f), (%f), (%f)\n",  ce1_shuffled[0],ce1_shuffled[1],ce1_shuffled[2],ce1_shuffled[3]);
+     // printf("DEBUG: ce1 summed   = (%f), (%f), (%f), (%f)\n",  ce1_fin[0],ce1_fin[1],ce1_fin[2],ce1_fin[3]);
 
      symbol1 =_mm_mul_ps(symbol1, ce1_fin);
      symbol2 =_mm_mul_ps(symbol2, ce2_fin);
@@ -328,7 +328,6 @@ void demod_16qam_lte_s_sse(const cf_t* symbols, short* llr, int nsymbols,const c
      symbol_abs = _mm_abs_epi16(symbol_i);
      symbol_abs = _mm_sub_epi16(symbol_abs, offsetnew);
      //original
-
 
      result11 = _mm_shuffle_epi8(symbol_i, shuffle_negated_1);
      result12 = _mm_shuffle_epi8(symbol_abs, shuffle_abs_1);
