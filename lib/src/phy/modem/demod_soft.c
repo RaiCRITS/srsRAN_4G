@@ -275,6 +275,9 @@ void demod_16qam_lte_s_sse(const cf_t* symbols, short* llr, int nsymbols,const c
    __m128   norm = _mm_set1_ps(0.0025);
 
   // RUBENS
+
+  printf("DEBUG: using sse");
+
    for (int i = 0; i < nsymbols / 4; i++) {
 
      symbol1 = _mm_load_ps(symbolsPtr);
