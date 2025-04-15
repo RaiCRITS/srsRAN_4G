@@ -726,6 +726,7 @@ static void demod_64qam_lte_s_sse(const cf_t* symbols, int16_t* llr, int nsymbol
   for (int i = 0; i < nsymbols / 4; i++) {
     symbol1 = _mm_load_ps(symbolsPtr);
     symbolsPtr += 4;
+
     symbol2 = _mm_load_ps(symbolsPtr);
     symbolsPtr += 4;
 
