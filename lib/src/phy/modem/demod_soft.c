@@ -683,126 +683,125 @@ static void demod_64qam_lte_s_sse(const cf_t* symbols, int16_t* llr, int nsymbol
   __m128i  symbol_i1, symbol_i2, symbol_i, symbol_abs, symbol_abs2;
 
 
-  __m128i  offset1 = _mm_set1_ps(4 * SCALE_SHORT_CONV_QAM64 / sqrtf(42));
-  __m128i  offset2 = _mm_set1_ps(2 * SCALE_SHORT_CONV_QAM64 / sqrtf(42));
 
-//ORIGINAL
+
   // __m128i  offset1 = _mm_set1_epi16(4 * SCALE_SHORT_CONV_QAM64 / sqrtf(42));
   // __m128i  offset2 = _mm_set1_epi16(2 * SCALE_SHORT_CONV_QAM64 / sqrtf(42));
-// ORIGINAL
+
 
   __m128   scale_v = _mm_set1_ps(-SCALE_SHORT_CONV_QAM64);
   __m128i  result11, result12, result13, result22, result21, result23, result31, result32, result33;
 
   __m128i shuffle_negated_1 = _mm_set_epi8(7, 6, 5, 4, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 3, 2, 1, 0);
   __m128i shuffle_negated_2 =
-      _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 11, 10, 9, 8, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
+  _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 11, 10, 9, 8, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
   __m128i shuffle_negated_3 =
-      _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 15, 14, 13, 12, 0xff, 0xff, 0xff, 0xff);
+  _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 15, 14, 13, 12, 0xff, 0xff, 0xff, 0xff);
 
   __m128i shuffle_abs_1 =
-      _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 3, 2, 1, 0, 0xff, 0xff, 0xff, 0xff);
+  _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 3, 2, 1, 0, 0xff, 0xff, 0xff, 0xff);
   __m128i shuffle_abs_2 = _mm_set_epi8(11, 10, 9, 8, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 7, 6, 5, 4);
   __m128i shuffle_abs_3 =
-      _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 15, 14, 13, 12, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
+  _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 15, 14, 13, 12, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
 
   __m128i shuffle_abs2_1 =
-      _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 3, 2, 1, 0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
+  _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 3, 2, 1, 0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
   __m128i shuffle_abs2_2 =
-      _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 7, 6, 5, 4, 0xff, 0xff, 0xff, 0xff);
+  _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 7, 6, 5, 4, 0xff, 0xff, 0xff, 0xff);
   __m128i shuffle_abs2_3 = _mm_set_epi8(15, 14, 13, 12, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 11, 10, 9, 8);
 
-
-
   //RUBENS
+  __m128   norm = _mm_set1_ps(0.00143);
   float*   cePtr = (float*)ce;
   __m128   ce1, ce2, ce2_fin, ce1_fin;
   __m128 ce1_shuffled, ce2_shuffled;
-  __m128   norm = _mm_set1_ps(0.0025);
-  __m128i  offsetnew11, offsetnew21, offsetnew12, offsetnew22 ,offsetnew2, offsetnew1;
+  __m128  offseta = _mm_set1_ps(4 * SCALE_SHORT_CONV_QAM64 / sqrtf(42));
+  __m128  offsetb = _mm_set1_ps(2 * SCALE_SHORT_CONV_QAM64 / sqrtf(42));
+  __m128i  offsetnewa1, offsetnewa2,offsetnewb1,offsetnewb2,offsetnew_b,offsetnew_a;
 
-  // RUBENS
+  //RUBENS
 
-  for (int i = 0; i < nsymbols / 4; i++) {
-    symbol1 = _mm_load_ps(symbolsPtr);
-    symbolsPtr += 4;
+   for (int i = 0; i < nsymbols / 4; i++) {
 
-    symbol2 = _mm_load_ps(symbolsPtr);
-    symbolsPtr += 4;
+     symbol1 = _mm_load_ps(symbolsPtr);
+     symbolsPtr += 4;
+     symbol2 = _mm_load_ps(symbolsPtr);
+     symbolsPtr += 4;
 
- //ORIGINAL
-    // symbol_i1 = _mm_cvtps_epi32(_mm_mul_ps(symbol1, scale_v));
-    // symbol_i2 = _mm_cvtps_epi32(_mm_mul_ps(symbol2, scale_v));
-    // symbol_i  = _mm_packs_epi32(symbol_i1, symbol_i2);
-    //ORGINAL
+     //RUBENS
+     ce1 = _mm_load_ps(cePtr);
+     cePtr += 4;
+     ce2 = _mm_load_ps(cePtr);
+     cePtr += 4;
 
-    //RUBENS
-    ce1 = _mm_load_ps(cePtr);
-    cePtr += 4;
-    ce2 = _mm_load_ps(cePtr);
-    cePtr += 4;
+     ce1 = _mm_mul_ps(ce1, ce1);
+     ce1 = _mm_mul_ps(ce1, norm);
+     ce2 = _mm_mul_ps(ce2, ce2);
+     ce2 = _mm_mul_ps(ce2, norm);
 
-    ce1 = _mm_mul_ps(ce1, ce1);
-    ce1 = _mm_mul_ps(ce1, norm);
-    ce2 = _mm_mul_ps(ce2, ce2);
-    ce2 = _mm_mul_ps(ce2, norm);
+     ce1_shuffled = _mm_shuffle_ps(ce1, ce1, _MM_SHUFFLE(2, 3, 0, 1));
+     ce1_fin = _mm_add_ps(ce1_shuffled, ce1);
+     ce2_shuffled = _mm_shuffle_ps(ce2, ce2, _MM_SHUFFLE(2, 3, 0, 1));
+     ce2_fin = _mm_add_ps(ce2_shuffled, ce2);
 
-    ce1_shuffled = _mm_shuffle_ps(ce1, ce1, _MM_SHUFFLE(2, 3, 0, 1));
-    ce1_fin = _mm_add_ps(ce1_shuffled, ce1);
-    ce2_shuffled = _mm_shuffle_ps(ce2, ce2, _MM_SHUFFLE(2, 3, 0, 1));
-    ce2_fin = _mm_add_ps(ce2_shuffled, ce2);
+     symbol1 =_mm_mul_ps(symbol1, ce1_fin);
+     symbol2 =_mm_mul_ps(symbol2, ce2_fin);
 
+     symbol_i1 = _mm_cvtps_epi32(_mm_mul_ps(symbol1, scale_v));
+     symbol_i2 = _mm_cvtps_epi32(_mm_mul_ps(symbol2, scale_v));
+     symbol_i  = _mm_packs_epi32(symbol_i1, symbol_i2);
 
-    symbol1 =_mm_mul_ps(symbol1, ce1_fin);
-    symbol2 =_mm_mul_ps(symbol2, ce2_fin);
+     offsetnewa1 = _mm_cvtps_epi32(_mm_mul_ps(offseta, ce1_fin));
+     offsetnewa2 = _mm_cvtps_epi32(_mm_mul_ps(offseta, ce2_fin));
+     offsetnew_a = _mm_packs_epi32(offsetnewa1, offsetnewa2);
 
-    offsetnew11 = _mm_cvtps_epi32(_mm_mul_ps(offset1, ce1_fin));
-    offsetnew12 = _mm_cvtps_epi32(_mm_mul_ps(offset1, ce2_fin));
-    offsetnew1 = _mm_packs_epi32(offsetnew11, offsetnew12);
+     offsetnewb1 = _mm_cvtps_epi32(_mm_mul_ps(offsetb, ce1_fin));
+     offsetnewb2 = _mm_cvtps_epi32(_mm_mul_ps(offsetb, ce2_fin));
+     offsetnew_b = _mm_packs_epi32(offsetnewb1, offsetnewb2);
 
-    offsetnew21 = _mm_cvtps_epi32(_mm_mul_ps(offset2, ce1_fin));
-    offsetnew22 = _mm_cvtps_epi32(_mm_mul_ps(offset2, ce2_fin));
-    offsetnew2 = _mm_packs_epi32(offsetnew21, offsetnew22);
-    //RUBENS
+//RUBENS
 
+     symbol_abs  = _mm_abs_epi16(symbol_i);
+     symbol_abs  = _mm_sub_epi16(symbol_abs, offsetnew_a);
+     symbol_abs2 = _mm_sub_epi16(_mm_abs_epi16(symbol_abs), offsetnew_b);
 
-    symbol_abs  = _mm_abs_epi16(symbol_i);
-    symbol_abs  = _mm_sub_epi16(symbol_abs, offsetnew1);
-    symbol_abs2 = _mm_sub_epi16(_mm_abs_epi16(symbol_abs), offsetnew2);
+     result11 = _mm_shuffle_epi8(symbol_i, shuffle_negated_1);
+     result12 = _mm_shuffle_epi8(symbol_abs, shuffle_abs_1);
+     result13 = _mm_shuffle_epi8(symbol_abs2, shuffle_abs2_1);
 
-    result11 = _mm_shuffle_epi8(symbol_i, shuffle_negated_1);
-    result12 = _mm_shuffle_epi8(symbol_abs, shuffle_abs_1);
-    result13 = _mm_shuffle_epi8(symbol_abs2, shuffle_abs2_1);
+     result21 = _mm_shuffle_epi8(symbol_i, shuffle_negated_2);
+     result22 = _mm_shuffle_epi8(symbol_abs, shuffle_abs_2);
+     result23 = _mm_shuffle_epi8(symbol_abs2, shuffle_abs2_2);
 
-    result21 = _mm_shuffle_epi8(symbol_i, shuffle_negated_2);
-    result22 = _mm_shuffle_epi8(symbol_abs, shuffle_abs_2);
-    result23 = _mm_shuffle_epi8(symbol_abs2, shuffle_abs2_2);
-
-    result31 = _mm_shuffle_epi8(symbol_i, shuffle_negated_3);
-    result32 = _mm_shuffle_epi8(symbol_abs, shuffle_abs_3);
-    result33 = _mm_shuffle_epi8(symbol_abs2, shuffle_abs2_3);
+     result31 = _mm_shuffle_epi8(symbol_i, shuffle_negated_3);
+     result32 = _mm_shuffle_epi8(symbol_abs, shuffle_abs_3);
+     result33 = _mm_shuffle_epi8(symbol_abs2, shuffle_abs2_3);
 
 
-    _mm_store_si128(resultPtr, _mm_or_si128(_mm_or_si128(result11, result12), result13));
-    resultPtr++;
-    _mm_store_si128(resultPtr, _mm_or_si128(_mm_or_si128(result21, result22), result23));
-    resultPtr++;
-    _mm_store_si128(resultPtr, _mm_or_si128(_mm_or_si128(result31, result32), result33));
-    resultPtr++;
+     _mm_store_si128(resultPtr, _mm_or_si128(_mm_or_si128(result11, result12), result13));
+     resultPtr++;
+     _mm_store_si128(resultPtr, _mm_or_si128(_mm_or_si128(result21, result22), result23));
+     resultPtr++;
+     _mm_store_si128(resultPtr, _mm_or_si128(_mm_or_si128(result31, result32), result33));
+     resultPtr++;
   }
 
   const int16_t threshold1 = 4 * SCALE_SHORT_CONV_QAM64 / sqrtf(42);
   const int16_t threshold2 = 2 * SCALE_SHORT_CONV_QAM64 / sqrtf(42);
+
+
   for (int i = 4 * (nsymbols / 4); i < nsymbols; i++) {
     int16_t yre = SCALE_SHORT_CONV_QAM64 * crealf(symbols[i]);
     int16_t yim = SCALE_SHORT_CONV_QAM64 * cimagf(symbols[i]);
 
-    llr[6 * i + 0] = -yre;
-    llr[6 * i + 1] = -yim;
-    llr[6 * i + 2] = (int16_t)abs(yre) - threshold1;
-    llr[6 * i + 3] = (int16_t)abs(yim) - threshold1;
-    llr[6 * i + 4] = (int16_t)abs(llr[6 * i + 2]) - threshold2;
-    llr[6 * i + 5] = (int16_t)abs(llr[6 * i + 3]) - threshold2;
+    short ce_mag = (short)(ce[i]*conj(ce[i]))*0.00143;
+
+    llr[6 * i + 0] = -yre*ce_mag;
+    llr[6 * i + 1] = -yim*ce_mag;
+    llr[6 * i + 2] = (int16_t)abs(yre)*ce_mag - threshold1*ce_mag;
+    llr[6 * i + 3] = (int16_t)abs(yim)*ce_mag - threshold1*ce_mag;
+    llr[6 * i + 4] = (int16_t)abs(llr[6 * i + 2]) - threshold2*ce_mag;
+    llr[6 * i + 5] = (int16_t)abs(llr[6 * i + 3]) - threshold2*ce_mag;
   }
 }
 
@@ -894,10 +893,10 @@ void demod_64qam_lte_b_sse(const cf_t* symbols, int8_t* llr, int nsymbols, const
 
 #endif
 
-void demod_64qam_lte_s(const cf_t* symbols, short* llr, int nsymbols)
+void demod_64qam_lte_s(const cf_t* symbols, short* llr, int nsymbols, const cf_t* ce)
 {
 #ifdef LV_HAVE_SSE
-  demod_64qam_lte_s_sse(symbols, llr, nsymbols);
+  demod_64qam_lte_s_sse(symbols, llr, nsymbols, ce);
 #else
 #ifdef HAVE_NEONv8
   demod_64qam_lte_s_neon(symbols, llr, nsymbols);
@@ -917,10 +916,10 @@ void demod_64qam_lte_s(const cf_t* symbols, short* llr, int nsymbols)
 #endif
 }
 
-void demod_64qam_lte_b(const cf_t* symbols, int8_t* llr, int nsymbols)
+void demod_64qam_lte_b(const cf_t* symbols, int8_t* llr, int nsymbols, const cf_t* ce)
 {
 #ifdef LV_HAVE_SSE
-  demod_64qam_lte_b_sse(symbols, llr, nsymbols);
+  demod_64qam_lte_b_sse(symbols, llr, nsymbols, ce);
 #else
 #ifdef HAVE_NEONv8
   demod_64qam_lte_b_neon(symbols, llr, nsymbols);
