@@ -334,8 +334,8 @@ int srsran_pmch_decode(srsran_pmch_t*         q,
                                     q->nof_rx_antennas,
                                     cfg->pdsch_cfg.grant.nof_re,
                                     1.0f,
-                                    //1.0f);
-                                    channel->noise_estimate);
+                                    1.0f);
+                                    //channel->noise_estimate);
 
     if (true)
       {
