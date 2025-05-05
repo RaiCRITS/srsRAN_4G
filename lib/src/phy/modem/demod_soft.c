@@ -1077,6 +1077,7 @@ int srsran_demod_soft_demodulate_b(srsran_mod_t modulation, const cf_t* symbols,
       ERROR("Invalid modulation %d", modulation);
       return -1;
 
+
   }
   return 0;
 }
