@@ -249,6 +249,7 @@ void demod_16qam_lte_b_neon(const cf_t* symbols, int8_t* llr, int nsymbols)
 
 void demod_16qam_lte_s_sse(const cf_t* symbols, short* llr, int nsymbols,const cf_t* ce)
 {
+  if (ce != NULL) {
    float*   symbolsPtr = (float*)symbols;
    __m128i* resultPtr  = (__m128i*)llr;
    __m128   symbol1, symbol2;
@@ -276,7 +277,6 @@ void demod_16qam_lte_s_sse(const cf_t* symbols, short* llr, int nsymbols,const c
 
   // RUBENS
 
-  printf("DEBUG: using sse");
 
    for (int i = 0; i < nsymbols / 4; i++) {
 
@@ -343,29 +343,64 @@ void demod_16qam_lte_s_sse(const cf_t* symbols, short* llr, int nsymbols,const c
      _mm_store_si128(resultPtr, _mm_or_si128(result21, result22));
      resultPtr++;
    }
+   } else {
+     float*   symbolsPtr = (float*)symbols;
+     __m128i* resultPtr  = (__m128i*)llr;
+     __m128   symbol1, symbol2;
+     __m128i  symbol_i1, symbol_i2, symbol_i, symbol_abs;
+     __m128i  offset = _mm_set1_epi16(2 * SCALE_SHORT_CONV_QAM16 / sqrtf(10));
+     __m128i  result11, result12, result22, result21;
+     __m128   scale_v           = _mm_set1_ps(-SCALE_SHORT_CONV_QAM16);
+     __m128i  shuffle_negated_1 = _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 7, 6, 5, 4, 0xff, 0xff, 0xff, 0xff, 3, 2, 1, 0);
+     __m128i  shuffle_abs_1     = _mm_set_epi8(7, 6, 5, 4, 0xff, 0xff, 0xff, 0xff, 3, 2, 1, 0, 0xff, 0xff, 0xff, 0xff);
+
+     __m128i shuffle_negated_2 =
+         _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 15, 14, 13, 12, 0xff, 0xff, 0xff, 0xff, 11, 10, 9, 8);
+     __m128i shuffle_abs_2 = _mm_set_epi8(15, 14, 13, 12, 0xff, 0xff, 0xff, 0xff, 11, 10, 9, 8, 0xff, 0xff, 0xff, 0xff);
+
+     for (int i = 0; i < nsymbols / 4; i++) {
+       symbol1 = _mm_load_ps(symbolsPtr);
+       symbolsPtr += 4;
+       symbol2 = _mm_load_ps(symbolsPtr);
+       symbolsPtr += 4;
+       symbol_i1 = _mm_cvtps_epi32(_mm_mul_ps(symbol1, scale_v));
+       symbol_i2 = _mm_cvtps_epi32(_mm_mul_ps(symbol2, scale_v));
+       symbol_i  = _mm_packs_epi32(symbol_i1, symbol_i2);
+
+       symbol_abs = _mm_abs_epi16(symbol_i);
+       symbol_abs = _mm_sub_epi16(symbol_abs, offset);
+
+       result11 = _mm_shuffle_epi8(symbol_i, shuffle_negated_1);
+       result12 = _mm_shuffle_epi8(symbol_abs, shuffle_abs_1);
+
+       result21 = _mm_shuffle_epi8(symbol_i, shuffle_negated_2);
+       result22 = _mm_shuffle_epi8(symbol_abs, shuffle_abs_2);
+
+       _mm_store_si128(resultPtr, _mm_or_si128(result11, result12));
+       resultPtr++;
+       _mm_store_si128(resultPtr, _mm_or_si128(result21, result22));
+       resultPtr++;
+   }
+   }
 
   // Demodulate last symbols
-
-
   for (int i = 4 * (nsymbols / 4); i < nsymbols; i++) {
     short yre = (short)(SCALE_SHORT_CONV_QAM16 * crealf(symbols[i]));
     short yim = (short)(SCALE_SHORT_CONV_QAM16 * cimagf(symbols[i]));
 
 
-    //RUBENS
-    short ce_mag = (short)(ce[i]*conj(ce[i]))*0.0025;
-    llr[4 * i + 0] = -yre*ce_mag;
-    llr[4 * i + 1] = -yim*ce_mag;
-    llr[4 * i + 2] = (abs(yre) - 2 * SCALE_SHORT_CONV_QAM16 / sqrtf(10))*ce_mag;
-    llr[4 * i + 3] = (abs(yim) - 2 * SCALE_SHORT_CONV_QAM16 / sqrtf(10))*ce_mag;
-    //RUBENS
-
-    //ORIGINAL
-    // llr[4 * i + 0] = -yre;
-    // llr[4 * i + 1] = -yim;
-    // llr[4 * i + 2] = (abs(yre) - 2 * SCALE_SHORT_CONV_QAM16 / sqrtf(10));
-    // llr[4 * i + 3] = (abs(yim) - 2 * SCALE_SHORT_CONV_QAM16 / sqrtf(10));
-    //ORIGINAL
+    if (ce != NULL){
+      short ce_mag = (short)(ce[i]*conj(ce[i]))*0.0025;
+      llr[4 * i + 0] = -yre*ce_mag;
+      llr[4 * i + 1] = -yim*ce_mag;
+      llr[4 * i + 2] = (abs(yre) - 2 * SCALE_SHORT_CONV_QAM16 / sqrtf(10))*ce_mag;
+      llr[4 * i + 3] = (abs(yim) - 2 * SCALE_SHORT_CONV_QAM16 / sqrtf(10))*ce_mag;
+    } else {
+      llr[4 * i + 0] = -yre;
+      llr[4 * i + 1] = -yim;
+      llr[4 * i + 2] = (abs(yre) - 2 * SCALE_SHORT_CONV_QAM16 / sqrtf(10));
+      llr[4 * i + 3] = (abs(yim) - 2 * SCALE_SHORT_CONV_QAM16 / sqrtf(10));
+    }
 
   }
 
@@ -476,7 +511,7 @@ void demod_16qam_lte_b(const cf_t* symbols, int8_t* llr, int nsymbols,const cf_t
 #endif
 }
 
-void demod_64qam_lte(const cf_t* symbols, float* llr, int nsymbols)
+void demod_64qam_lte(const cf_t* symbols, float* llr, int nsymbols, const cf_t* ce)
 {
   for (int i = 0; i < nsymbols; i++) {
     float yre = crealf(symbols[i]);
@@ -640,85 +675,137 @@ void demod_64qam_lte_b_neon(const cf_t* symbols, int8_t* llr, int nsymbols)
 
 #ifdef LV_HAVE_SSE
 
-static void demod_64qam_lte_s_sse(const cf_t* symbols, int16_t* llr, int nsymbols)
+static void demod_64qam_lte_s_sse(const cf_t* symbols, int16_t* llr, int nsymbols, const cf_t* ce)
 {
   float*   symbolsPtr = (float*)symbols;
   __m128i* resultPtr  = (__m128i*)llr;
   __m128   symbol1, symbol2;
   __m128i  symbol_i1, symbol_i2, symbol_i, symbol_abs, symbol_abs2;
-  __m128i  offset1 = _mm_set1_epi16(4 * SCALE_SHORT_CONV_QAM64 / sqrtf(42));
-  __m128i  offset2 = _mm_set1_epi16(2 * SCALE_SHORT_CONV_QAM64 / sqrtf(42));
+
+
+
+
+  // __m128i  offset1 = _mm_set1_epi16(4 * SCALE_SHORT_CONV_QAM64 / sqrtf(42));
+  // __m128i  offset2 = _mm_set1_epi16(2 * SCALE_SHORT_CONV_QAM64 / sqrtf(42));
+
+
   __m128   scale_v = _mm_set1_ps(-SCALE_SHORT_CONV_QAM64);
   __m128i  result11, result12, result13, result22, result21, result23, result31, result32, result33;
 
   __m128i shuffle_negated_1 = _mm_set_epi8(7, 6, 5, 4, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 3, 2, 1, 0);
   __m128i shuffle_negated_2 =
-      _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 11, 10, 9, 8, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
+  _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 11, 10, 9, 8, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
   __m128i shuffle_negated_3 =
-      _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 15, 14, 13, 12, 0xff, 0xff, 0xff, 0xff);
+  _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 15, 14, 13, 12, 0xff, 0xff, 0xff, 0xff);
 
   __m128i shuffle_abs_1 =
-      _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 3, 2, 1, 0, 0xff, 0xff, 0xff, 0xff);
+  _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 3, 2, 1, 0, 0xff, 0xff, 0xff, 0xff);
   __m128i shuffle_abs_2 = _mm_set_epi8(11, 10, 9, 8, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 7, 6, 5, 4);
   __m128i shuffle_abs_3 =
-      _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 15, 14, 13, 12, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
+  _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 15, 14, 13, 12, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
 
   __m128i shuffle_abs2_1 =
-      _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 3, 2, 1, 0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
+  _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 3, 2, 1, 0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff);
   __m128i shuffle_abs2_2 =
-      _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 7, 6, 5, 4, 0xff, 0xff, 0xff, 0xff);
+  _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 7, 6, 5, 4, 0xff, 0xff, 0xff, 0xff);
   __m128i shuffle_abs2_3 = _mm_set_epi8(15, 14, 13, 12, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 11, 10, 9, 8);
 
-  for (int i = 0; i < nsymbols / 4; i++) {
-    symbol1 = _mm_load_ps(symbolsPtr);
-    symbolsPtr += 4;
-    symbol2 = _mm_load_ps(symbolsPtr);
-    symbolsPtr += 4;
-    symbol_i1 = _mm_cvtps_epi32(_mm_mul_ps(symbol1, scale_v));
-    symbol_i2 = _mm_cvtps_epi32(_mm_mul_ps(symbol2, scale_v));
-    symbol_i  = _mm_packs_epi32(symbol_i1, symbol_i2);
+  //RUBENS
+  __m128   norm = _mm_set1_ps(0.00143);
+  float*   cePtr = (float*)ce;
+  __m128   ce1, ce2, ce2_fin, ce1_fin;
+  __m128 ce1_shuffled, ce2_shuffled;
+  __m128  offseta = _mm_set1_ps(4 * SCALE_SHORT_CONV_QAM64 / sqrtf(42));
+  __m128  offsetb = _mm_set1_ps(2 * SCALE_SHORT_CONV_QAM64 / sqrtf(42));
+  __m128i  offsetnewa1, offsetnewa2,offsetnewb1,offsetnewb2,offsetnew_b,offsetnew_a;
 
-    symbol_abs  = _mm_abs_epi16(symbol_i);
-    symbol_abs  = _mm_sub_epi16(symbol_abs, offset1);
-    symbol_abs2 = _mm_sub_epi16(_mm_abs_epi16(symbol_abs), offset2);
+  //RUBENS
 
-    result11 = _mm_shuffle_epi8(symbol_i, shuffle_negated_1);
-    result12 = _mm_shuffle_epi8(symbol_abs, shuffle_abs_1);
-    result13 = _mm_shuffle_epi8(symbol_abs2, shuffle_abs2_1);
+   for (int i = 0; i < nsymbols / 4; i++) {
 
-    result21 = _mm_shuffle_epi8(symbol_i, shuffle_negated_2);
-    result22 = _mm_shuffle_epi8(symbol_abs, shuffle_abs_2);
-    result23 = _mm_shuffle_epi8(symbol_abs2, shuffle_abs2_2);
+     symbol1 = _mm_load_ps(symbolsPtr);
+     symbolsPtr += 4;
+     symbol2 = _mm_load_ps(symbolsPtr);
+     symbolsPtr += 4;
 
-    result31 = _mm_shuffle_epi8(symbol_i, shuffle_negated_3);
-    result32 = _mm_shuffle_epi8(symbol_abs, shuffle_abs_3);
-    result33 = _mm_shuffle_epi8(symbol_abs2, shuffle_abs2_3);
+     //RUBENS
+     ce1 = _mm_load_ps(cePtr);
+     cePtr += 4;
+     ce2 = _mm_load_ps(cePtr);
+     cePtr += 4;
+
+     ce1 = _mm_mul_ps(ce1, ce1);
+     ce1 = _mm_mul_ps(ce1, norm);
+     ce2 = _mm_mul_ps(ce2, ce2);
+     ce2 = _mm_mul_ps(ce2, norm);
+
+     ce1_shuffled = _mm_shuffle_ps(ce1, ce1, _MM_SHUFFLE(2, 3, 0, 1));
+     ce1_fin = _mm_add_ps(ce1_shuffled, ce1);
+     ce2_shuffled = _mm_shuffle_ps(ce2, ce2, _MM_SHUFFLE(2, 3, 0, 1));
+     ce2_fin = _mm_add_ps(ce2_shuffled, ce2);
+
+     symbol1 =_mm_mul_ps(symbol1, ce1_fin);
+     symbol2 =_mm_mul_ps(symbol2, ce2_fin);
+
+     symbol_i1 = _mm_cvtps_epi32(_mm_mul_ps(symbol1, scale_v));
+     symbol_i2 = _mm_cvtps_epi32(_mm_mul_ps(symbol2, scale_v));
+     symbol_i  = _mm_packs_epi32(symbol_i1, symbol_i2);
+
+     offsetnewa1 = _mm_cvtps_epi32(_mm_mul_ps(offseta, ce1_fin));
+     offsetnewa2 = _mm_cvtps_epi32(_mm_mul_ps(offseta, ce2_fin));
+     offsetnew_a = _mm_packs_epi32(offsetnewa1, offsetnewa2);
+
+     offsetnewb1 = _mm_cvtps_epi32(_mm_mul_ps(offsetb, ce1_fin));
+     offsetnewb2 = _mm_cvtps_epi32(_mm_mul_ps(offsetb, ce2_fin));
+     offsetnew_b = _mm_packs_epi32(offsetnewb1, offsetnewb2);
+
+//RUBENS
+
+     symbol_abs  = _mm_abs_epi16(symbol_i);
+     symbol_abs  = _mm_sub_epi16(symbol_abs, offsetnew_a);
+     symbol_abs2 = _mm_sub_epi16(_mm_abs_epi16(symbol_abs), offsetnew_b);
+
+     result11 = _mm_shuffle_epi8(symbol_i, shuffle_negated_1);
+     result12 = _mm_shuffle_epi8(symbol_abs, shuffle_abs_1);
+     result13 = _mm_shuffle_epi8(symbol_abs2, shuffle_abs2_1);
+
+     result21 = _mm_shuffle_epi8(symbol_i, shuffle_negated_2);
+     result22 = _mm_shuffle_epi8(symbol_abs, shuffle_abs_2);
+     result23 = _mm_shuffle_epi8(symbol_abs2, shuffle_abs2_2);
+
+     result31 = _mm_shuffle_epi8(symbol_i, shuffle_negated_3);
+     result32 = _mm_shuffle_epi8(symbol_abs, shuffle_abs_3);
+     result33 = _mm_shuffle_epi8(symbol_abs2, shuffle_abs2_3);
 
 
-    _mm_store_si128(resultPtr, _mm_or_si128(_mm_or_si128(result11, result12), result13));
-    resultPtr++;
-    _mm_store_si128(resultPtr, _mm_or_si128(_mm_or_si128(result21, result22), result23));
-    resultPtr++;
-    _mm_store_si128(resultPtr, _mm_or_si128(_mm_or_si128(result31, result32), result33));
-    resultPtr++;
+     _mm_store_si128(resultPtr, _mm_or_si128(_mm_or_si128(result11, result12), result13));
+     resultPtr++;
+     _mm_store_si128(resultPtr, _mm_or_si128(_mm_or_si128(result21, result22), result23));
+     resultPtr++;
+     _mm_store_si128(resultPtr, _mm_or_si128(_mm_or_si128(result31, result32), result33));
+     resultPtr++;
   }
 
   const int16_t threshold1 = 4 * SCALE_SHORT_CONV_QAM64 / sqrtf(42);
   const int16_t threshold2 = 2 * SCALE_SHORT_CONV_QAM64 / sqrtf(42);
+
+
   for (int i = 4 * (nsymbols / 4); i < nsymbols; i++) {
     int16_t yre = SCALE_SHORT_CONV_QAM64 * crealf(symbols[i]);
     int16_t yim = SCALE_SHORT_CONV_QAM64 * cimagf(symbols[i]);
 
-    llr[6 * i + 0] = -yre;
-    llr[6 * i + 1] = -yim;
-    llr[6 * i + 2] = (int16_t)abs(yre) - threshold1;
-    llr[6 * i + 3] = (int16_t)abs(yim) - threshold1;
-    llr[6 * i + 4] = (int16_t)abs(llr[6 * i + 2]) - threshold2;
-    llr[6 * i + 5] = (int16_t)abs(llr[6 * i + 3]) - threshold2;
+    short ce_mag = (short)(ce[i]*conj(ce[i]))*0.00143;
+
+    llr[6 * i + 0] = -yre*ce_mag;
+    llr[6 * i + 1] = -yim*ce_mag;
+    llr[6 * i + 2] = (int16_t)abs(yre)*ce_mag - threshold1*ce_mag;
+    llr[6 * i + 3] = (int16_t)abs(yim)*ce_mag - threshold1*ce_mag;
+    llr[6 * i + 4] = (int16_t)abs(llr[6 * i + 2]) - threshold2*ce_mag;
+    llr[6 * i + 5] = (int16_t)abs(llr[6 * i + 3]) - threshold2*ce_mag;
   }
 }
 
-void demod_64qam_lte_b_sse(const cf_t* symbols, int8_t* llr, int nsymbols)
+void demod_64qam_lte_b_sse(const cf_t* symbols, int8_t* llr, int nsymbols, const cf_t* ce)
 {
   float*   symbolsPtr = (float*)symbols;
   __m128i* resultPtr  = (__m128i*)llr;
@@ -806,10 +893,10 @@ void demod_64qam_lte_b_sse(const cf_t* symbols, int8_t* llr, int nsymbols)
 
 #endif
 
-void demod_64qam_lte_s(const cf_t* symbols, short* llr, int nsymbols)
+void demod_64qam_lte_s(const cf_t* symbols, short* llr, int nsymbols, const cf_t* ce)
 {
 #ifdef LV_HAVE_SSE
-  demod_64qam_lte_s_sse(symbols, llr, nsymbols);
+  demod_64qam_lte_s_sse(symbols, llr, nsymbols, ce);
 #else
 #ifdef HAVE_NEONv8
   demod_64qam_lte_s_neon(symbols, llr, nsymbols);
@@ -829,10 +916,10 @@ void demod_64qam_lte_s(const cf_t* symbols, short* llr, int nsymbols)
 #endif
 }
 
-void demod_64qam_lte_b(const cf_t* symbols, int8_t* llr, int nsymbols)
+void demod_64qam_lte_b(const cf_t* symbols, int8_t* llr, int nsymbols, const cf_t* ce)
 {
 #ifdef LV_HAVE_SSE
-  demod_64qam_lte_b_sse(symbols, llr, nsymbols);
+  demod_64qam_lte_b_sse(symbols, llr, nsymbols, ce);
 #else
 #ifdef HAVE_NEONv8
   demod_64qam_lte_b_neon(symbols, llr, nsymbols);
@@ -931,7 +1018,7 @@ int srsran_demod_soft_demodulate(srsran_mod_t modulation, const cf_t* symbols, f
       demod_16qam_lte(symbols, llr, nsymbols, ce);
       break;
     case SRSRAN_MOD_64QAM:
-      demod_64qam_lte(symbols, llr, nsymbols);
+      demod_64qam_lte(symbols, llr, nsymbols, ce);
       break;
     case SRSRAN_MOD_256QAM:
       demod_256qam_lte(symbols, llr, nsymbols);
@@ -956,7 +1043,7 @@ int srsran_demod_soft_demodulate_s(srsran_mod_t modulation, const cf_t* symbols,
       demod_16qam_lte_s(symbols, llr, nsymbols, ce);
       break;
     case SRSRAN_MOD_64QAM:
-      demod_64qam_lte_s(symbols, llr, nsymbols);
+      demod_64qam_lte_s(symbols, llr, nsymbols, ce);
       break;
     case SRSRAN_MOD_256QAM:
       demod_256qam_lte_s(symbols, llr, nsymbols);
@@ -981,7 +1068,7 @@ int srsran_demod_soft_demodulate_b(srsran_mod_t modulation, const cf_t* symbols,
       demod_16qam_lte_b(symbols, llr, nsymbols, ce);
       break;
     case SRSRAN_MOD_64QAM:
-      demod_64qam_lte_b(symbols, llr, nsymbols);
+      demod_64qam_lte_b(symbols, llr, nsymbols, ce);
       break;
     case SRSRAN_MOD_256QAM:
       demod_256qam_lte_b(symbols, llr, nsymbols);
