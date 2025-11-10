@@ -337,7 +337,7 @@ int srsran_pmch_decode(srsran_pmch_t*         q,
                                     1.0f);
                                     //channel->noise_estimate);
 
-    if (true)
+    if (SRSRAN_VERBOSE_ISDEBUG)
       {
       DEBUG("SAVED FILE subframe.dat: received subframe symbols");
       srsran_vec_save_file("subframe2.dat", q->symbols[0], cfg->pdsch_cfg.grant.nof_re * sizeof(cf_t));
@@ -362,7 +362,7 @@ int srsran_pmch_decode(srsran_pmch_t*         q,
     srsran_scrambling_s_offset(&q->seqs[cfg->area_id]->seq[sf->tti % 10], q->e, 0, cfg->pdsch_cfg.grant.tb[0].nof_bits);
 
 
-    if (true) {
+    if (SRSRAN_VERBOSE_ISDEBUG) {
       DEBUG("SAVED FILE llr.dat: LLR estimates after demodulation and descrambling");
       srsran_vec_save_file("llr.dat", q->e, cfg->pdsch_cfg.grant.tb[0].nof_bits * sizeof(int16_t));
     }
