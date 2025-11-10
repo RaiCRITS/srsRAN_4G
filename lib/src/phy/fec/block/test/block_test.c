@@ -73,11 +73,10 @@ int test(uint32_t block_size)
   uint8_t        encoded[4 * SRSRAN_FEC_BLOCK_SIZE] = {};
   int16_t        llr_i16[4 * SRSRAN_FEC_BLOCK_SIZE] = {};
   int8_t         llr_i8[4 * SRSRAN_FEC_BLOCK_SIZE]  = {};
-
-  // Generate random data
-  for (uint32_t i = 0; i < block_size; i++) {
-    tx[i] = (uint8_t)srsran_random_uniform_int_dist(random_gen, 0, 1);
-  }
+// Generate random data
+//  for (uint32_t i = 0; i < block_size; i++) {
+//   tx[i] = (uint8_t)srsran_random_uniform_int_dist(random_gen, 0, 1);
+// }
 
   gettimeofday(&t[1], NULL);
   for (uint32_t r = 0; r < nof_repetitions; r++) {

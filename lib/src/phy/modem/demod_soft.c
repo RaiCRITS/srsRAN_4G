@@ -37,6 +37,17 @@
     *res = vsetq_lane_s32(vgetq_lane_s32((a), ((imm) >> 6) & 0x3), *res, 3);                                           \
   } while (0)
 
+//NEW shuffle for neon vector for multiplication CE and symbol
+#define vshuff_f32_badc(src, res)                                                                                   \
+  do {                                                                                                                 \
+    *res = vsetq_lane_f32(vgetq_lane_f32((src) ,1), *res, 0);                                           \
+    *res = vsetq_lane_f32(vgetq_lane_f32((src) ,0), *res, 1);                                           \
+    *res = vsetq_lane_f32(vgetq_lane_f32((src) ,3), *res, 2);                                           \
+    *res = vsetq_lane_f32(vgetq_lane_f32((src) ,2), *res, 3);                                           \
+  } while (0)
+
+
+
 #define vshuff_s32_odd(a, imm, res)                                                                                    \
   do {                                                                                                                 \
     *res = vsetq_lane_s32(vgetq_lane_s32((a), (imm)&0x3), *res, 0);                                                    \
@@ -137,7 +148,7 @@ void demod_16qam_lte(const cf_t* symbols, float* llr, int nsymbols,const cf_t* c
 
 #ifdef HAVE_NEONv8
 
-void demod_16qam_lte_s_neon(const cf_t* symbols, short* llr, int nsymbols)
+void demod_16qam_lte_s_neon(const cf_t* symbols, short* llr, int nsymbols, const cf_t* ce)
 {
   float*      symbolsPtr = (float*)symbols;
   int16x8_t*  resultPtr  = (int16x8_t*)llr;
@@ -147,8 +158,14 @@ void demod_16qam_lte_s_neon(const cf_t* symbols, short* llr, int nsymbols)
   int8x16_t   result11, result21;
   result11            = vdupq_n_s8(0);
   result21            = vdupq_n_s8(0);
-  int16x8_t   offset  = vdupq_n_s16(2 * SCALE_SHORT_CONV_QAM16 / sqrtf(10));
+//  int16x8_t   offset  = vdupq_n_s16(2 * SCALE_SHORT_CONV_QAM16 / sqrtf(10));
   float32x4_t scale_v = vdupq_n_f32(-SCALE_SHORT_CONV_QAM16);
+
+  float*        cePtr = (float*)ce;
+  float32x4_t	norm = vdupq_n_f32(0.0025);
+  float32x4_t   ce1, ce2, ce1shuff, ce2shuff;
+  float32x4_t   offset  = vdupq_n_f32(2 * SCALE_SHORT_CONV_QAM16 / sqrtf(10));
+  int16x8_t		offsetnew1, offsetnew2, offsetnew;
 
   for (int i = 0; i < nsymbols / 4; i++) {
     symbol1 = vld1q_f32(symbolsPtr);
@@ -156,12 +173,33 @@ void demod_16qam_lte_s_neon(const cf_t* symbols, short* llr, int nsymbols)
     symbol2 = vld1q_f32(symbolsPtr);
     symbolsPtr += 4;
 
+
+    ce1 = vld1q_f32(cePtr);
+    cePtr += 4;
+    ce2 = vld1q_f32(cePtr);
+    cePtr += 4;
+
+	ce1 = vmulq_f32(ce1, ce1);
+	ce2 = vmulq_f32(ce2, ce2);
+	ce1 = vmulq_f32(ce1, norm);
+	ce2	= vmulq_f32(ce2, norm);
+	vshuff_f32_badc(ce1, &ce1shuff);
+    vshuff_f32_badc(ce2, &ce2shuff);
+    ce1 = vaddq_f32(ce1, ce2shuff);
+	ce2 = vaddq_f32(ce1, ce2shuff);
+	symbol1 = vmulq_f32(symbol1, ce1);
+	symbol2 = vmulq_f32(symbol2, ce2);
+
     symbol_i1 = vcvtnq_s32_f32(vmulq_f32(symbol1, scale_v));
     symbol_i2 = vcvtnq_s32_f32(vmulq_f32(symbol2, scale_v));
     symbol_i  = vcombine_s16(vqmovn_s32(symbol_i1), vqmovn_s32(symbol_i2));
 
+	offsetnew1 = vcvtq_s32_f32(vmulq_f32(offset, ce1));
+	offsetnew2 = vcvtq_s32_f32(vmulq_f32(offset, ce2));
+	offsetnew = vcombine_s16(vmovn_s32(offsetnew1), vmovn_s32(offsetnew2));
+
     symbol_abs = vqabsq_s16(symbol_i);
-    symbol_abs = vsubq_s16(symbol_abs, offset);
+    symbol_abs = vsubq_s16(symbol_abs, offsetnew);
 
     vshuff_s32_odd((int32x4_t)symbol_i, 16, (int32x4_t*)&result11);
     vshuff_s32_even((int32x4_t)symbol_abs, 64, (int32x4_t*)&result11);
@@ -186,7 +224,7 @@ void demod_16qam_lte_s_neon(const cf_t* symbols, short* llr, int nsymbols)
   }
 }
 
-void demod_16qam_lte_b_neon(const cf_t* symbols, int8_t* llr, int nsymbols)
+void demod_16qam_lte_b_neon(const cf_t* symbols, int8_t* llr, int nsymbols, const cf_t* ce)
 {
   float*      symbolsPtr = (float*)symbols;
   int8x16_t*  resultPtr  = (int8x16_t*)llr;
@@ -267,15 +305,13 @@ void demod_16qam_lte_s_sse(const cf_t* symbols, short* llr, int nsymbols,const c
        _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 15, 14, 13, 12, 0xff, 0xff, 0xff, 0xff, 11, 10, 9, 8);
    __m128i shuffle_abs_2 = _mm_set_epi8(15, 14, 13, 12, 0xff, 0xff, 0xff, 0xff, 11, 10, 9, 8, 0xff, 0xff, 0xff, 0xff);
 
-   //RUBENS
+   //Define pointer to CE calculation
    float*   cePtr = (float*)ce;
    __m128   ce1, ce2, ce2_fin, ce1_fin;
   __m128 ce1_shuffled, ce2_shuffled;
   __m128i  offsetnew;
   __m128i  offsetnew1, offsetnew2;
    __m128   norm = _mm_set1_ps(0.0025);
-
-  // RUBENS
 
 
    for (int i = 0; i < nsymbols / 4; i++) {
@@ -284,22 +320,10 @@ void demod_16qam_lte_s_sse(const cf_t* symbols, short* llr, int nsymbols,const c
      symbolsPtr += 4;
      symbol2 = _mm_load_ps(symbolsPtr);
      symbolsPtr += 4;
-     //RUBENS
      ce1 = _mm_load_ps(cePtr);
      cePtr += 4;
      ce2 = _mm_load_ps(cePtr);
      cePtr += 4;
-     //RUBENS
-
-     // IMPORTANT PROOF THAT CE HAS 1 COMPLEX ELEMENT FOR EACH SYMBOL IN THIS CASE CE 1 THAT IS 4i+5 IS THE SAME AS 4i
-     // printf("DEBUG: CE 1= (%f), (%f)\n",  crealf(ce[4*i]),cimagf(ce[4*i]));
-     // printf("DEBUG: CE 2= (%f), (%f)\n",  crealf(ce[4*i+1]),cimagf(ce[4*i+1]));
-     // printf("DEBUG: CE 3= (%f), (%f)\n",  crealf(ce[4*i+2]),cimagf(ce[4*i+2]));
-     // printf("DEBUG: CE 4= (%f), (%f)\n",  crealf(ce[4*i+3]),cimagf(ce[4*i+3]));
-
-     //IMPORTANT PROOF FOR SYMBOL1 2 AND SYMBOLS HOW COMPLEX FLOATS ARE CONSIDERED
-     // printf("DEBUG: symbol1 = (%f), (%f)\n",  symbol1[0],symbol1[1]);
-     // printf("DEBUG: symbols = (%f), (%f)\n",  crealf(symbols[4*i]),cimagf(symbols[4*i]));
 
      ce1 = _mm_mul_ps(ce1, ce1);
      ce1 = _mm_mul_ps(ce1, norm);
@@ -311,26 +335,19 @@ void demod_16qam_lte_s_sse(const cf_t* symbols, short* llr, int nsymbols,const c
      ce2_shuffled = _mm_shuffle_ps(ce2, ce2, _MM_SHUFFLE(2, 3, 0, 1));
      ce2_fin = _mm_add_ps(ce2_shuffled, ce2);
 
-     // printf("DEBUG: ce1          = (%f), (%f), (%f), (%f)\n",  ce1[0],ce1[1],ce1[2],ce1[3]);
-     // printf("DEBUG: ce1 shuffled = (%f), (%f), (%f), (%f)\n",  ce1_shuffled[0],ce1_shuffled[1],ce1_shuffled[2],ce1_shuffled[3]);
-     // printf("DEBUG: ce1 summed   = (%f), (%f), (%f), (%f)\n",  ce1_fin[0],ce1_fin[1],ce1_fin[2],ce1_fin[3]);
-
      symbol1 =_mm_mul_ps(symbol1, ce1_fin);
      symbol2 =_mm_mul_ps(symbol2, ce2_fin);
 
 
-     //RUBENS OFFSET
+
      offsetnew1 = _mm_cvtps_epi32(_mm_mul_ps(offset, ce1_fin));
      offsetnew2 = _mm_cvtps_epi32(_mm_mul_ps(offset, ce2_fin));
      offsetnew = _mm_packs_epi32(offsetnew1, offsetnew2);
-     //RUBENS
-     // ORIGINAL
      symbol_i1 = _mm_cvtps_epi32(_mm_mul_ps(symbol1, scale_v));
      symbol_i2 = _mm_cvtps_epi32(_mm_mul_ps(symbol2, scale_v));
      symbol_i  = _mm_packs_epi32(symbol_i1, symbol_i2);
      symbol_abs = _mm_abs_epi16(symbol_i);
      symbol_abs = _mm_sub_epi16(symbol_abs, offsetnew);
-     //original
 
      result11 = _mm_shuffle_epi8(symbol_i, shuffle_negated_1);
      result12 = _mm_shuffle_epi8(symbol_abs, shuffle_abs_1);
@@ -475,7 +492,7 @@ void demod_16qam_lte_s(const cf_t* symbols, short* llr, int nsymbols,const cf_t*
   demod_16qam_lte_s_sse(symbols, llr, nsymbols, ce);
 #else
 #ifdef HAVE_NEONv8
-  demod_16qam_lte_s_neon(symbols, llr, nsymbols);
+  demod_16qam_lte_s_neon(symbols, llr, nsymbols, ce);
 #else
   for (int i = 0; i < nsymbols; i++) {
     short yre = (short)(SCALE_SHORT_CONV_QAM16 * crealf(symbols[i]));
@@ -710,7 +727,6 @@ static void demod_64qam_lte_s_sse(const cf_t* symbols, int16_t* llr, int nsymbol
   _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 7, 6, 5, 4, 0xff, 0xff, 0xff, 0xff);
   __m128i shuffle_abs2_3 = _mm_set_epi8(15, 14, 13, 12, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 11, 10, 9, 8);
 
-  //RUBENS
   __m128   norm = _mm_set1_ps(0.00143);
   float*   cePtr = (float*)ce;
   __m128   ce1, ce2, ce2_fin, ce1_fin;
@@ -719,8 +735,6 @@ static void demod_64qam_lte_s_sse(const cf_t* symbols, int16_t* llr, int nsymbol
   __m128  offsetb = _mm_set1_ps(2 * SCALE_SHORT_CONV_QAM64 / sqrtf(42));
   __m128i  offsetnewa1, offsetnewa2,offsetnewb1,offsetnewb2,offsetnew_b,offsetnew_a;
 
-  //RUBENS
-
    for (int i = 0; i < nsymbols / 4; i++) {
 
      symbol1 = _mm_load_ps(symbolsPtr);
@@ -728,7 +742,6 @@ static void demod_64qam_lte_s_sse(const cf_t* symbols, int16_t* llr, int nsymbol
      symbol2 = _mm_load_ps(symbolsPtr);
      symbolsPtr += 4;
 
-     //RUBENS
      ce1 = _mm_load_ps(cePtr);
      cePtr += 4;
      ce2 = _mm_load_ps(cePtr);
@@ -758,8 +771,6 @@ static void demod_64qam_lte_s_sse(const cf_t* symbols, int16_t* llr, int nsymbol
      offsetnewb1 = _mm_cvtps_epi32(_mm_mul_ps(offsetb, ce1_fin));
      offsetnewb2 = _mm_cvtps_epi32(_mm_mul_ps(offsetb, ce2_fin));
      offsetnew_b = _mm_packs_epi32(offsetnewb1, offsetnewb2);
-
-//RUBENS
 
      symbol_abs  = _mm_abs_epi16(symbol_i);
      symbol_abs  = _mm_sub_epi16(symbol_abs, offsetnew_a);

@@ -358,22 +358,6 @@ int srsran_pmch_decode(srsran_pmch_t*         q,
      */
     srsran_demod_soft_demodulate_s(cfg->pdsch_cfg.grant.tb[0].mod, q->d, q->e, cfg->pdsch_cfg.grant.nof_re, q->ce[0][0]);
 
-  // - modified ALC commented because inputed in the demod soft.h function
-
-//     short *qb = q->e;
-//     for (int i = 0; i < cfg->pdsch_cfg.grant.nof_re; i++) {
-//       for (int j = 0; j < 4; j++){
-//         float h;
-//         h = (q->ce[0][0][i] * conj(q->ce[0][0][i]))*0.0025;
-//         qb[i*4 + j] = qb[i*4 + j]*h;
-//         // printf("%f \n", h);
-// //rubens
-//         // qb[i*4 + j] = qb[i*4 + j] * (q->ce[0][0][i] * conj(q->ce[0][0][i]))*0.0025;
-//       }
-//     }
-  
-  // - modified ALC
-
     /* descramble */
     srsran_scrambling_s_offset(&q->seqs[cfg->area_id]->seq[sf->tti % 10], q->e, 0, cfg->pdsch_cfg.grant.tb[0].nof_bits);
 

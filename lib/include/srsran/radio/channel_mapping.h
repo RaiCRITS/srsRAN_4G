@@ -139,7 +139,7 @@ public:
    * Represents the channel mapping into a string
    * @return a string representing the current channel mapping
    */
-  std::string to_string() const;
+std::string to_string() const;
 
 private:
   std::list<channel_cfg_t>          available_channels = {};

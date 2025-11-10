@@ -368,8 +368,12 @@ int srsran_ue_cellsearch_scan_N_id_2(srsran_ue_cellsearch_t*        q,
          * Do nothing, just wait and increase nof_scanned_frames counter.
          */
       }
+			
+			
+	printf("[DEBUG] Scanned frames,max frames: %d < %d, Detected frames valid frames: %d %d \n", nof_scanned_frames, q->max_frames, nof_detected_frames, q->nof_valid_frames);
 
       nof_scanned_frames++;
+
 
     } while (nof_scanned_frames < q->max_frames && nof_detected_frames < q->nof_valid_frames);
 
