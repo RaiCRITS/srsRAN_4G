@@ -292,7 +292,7 @@ int srsran_ue_cellsearch_scan(srsran_ue_cellsearch_t*       q,
                               uint32_t*                     max_N_id_2)
 {
   int      ret                = 0;
-  float    max_peak_value     = -1.0;
+  float    max_peak_value     = -1.0;  
   uint32_t nof_detected_cells = 0;
 
   for (uint32_t N_id_2 = 0; N_id_2 < 3; N_id_2++) {
@@ -370,7 +370,7 @@ int srsran_ue_cellsearch_scan_N_id_2(srsran_ue_cellsearch_t*        q,
       }
 			
 			
-	printf("[DEBUG] Scanned frames,max frames: %d < %d, Detected frames valid frames: %d %d \n", nof_scanned_frames, q->max_frames, nof_detected_frames, q->nof_valid_frames);
+	//printf("[DEBUG] Scanned frames,max frames: %d < %d, Detected frames valid frames: %d %d \n", nof_scanned_frames, q->max_frames, nof_detected_frames, q->nof_valid_frames);
 
       nof_scanned_frames++;
 
