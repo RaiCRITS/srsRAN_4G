@@ -71,26 +71,34 @@ uint32_t ra_re_x_prb(const srsran_cell_t* cell, srsran_dl_sf_cfg_t* sf, uint32_t
 
   /* if it's the prb in the middle, there are less RE due to PBCH and PSS/SSS */
 
-  /* when nof_prb > 6, the cell is MBMS dedicated and PBCH repetiton is configured,
-   * 3 REs will be used for repeated PBCH symbols. Subtract them as well. */
-  bool has_pbch_repetition = cell->mbms_dedicated && cell->nof_prb > 6 && cell->has_pbch_repetition_r16;
+  /* PBCH repetition (Rel-16) adds extra symbols only in non-CAS sf0 (sfn%4 != 0).
+   * CAS sf0 (sfn%4 == 0) already excludes standard PBCH REs; no extra reduction needed. */
+  bool is_cas_frame        = !cell->mbms_dedicated || (sf->tti / 10) % 4 == 0;
+  bool has_pbch_repetition = cell->mbms_dedicated && cell->nof_prb > 6 && cell->has_pbch_repetition_r16 && !is_cas_frame;
 
   if (cell->frame_type == SRSRAN_FDD) {
     if ((subframe == 0 || subframe == 5) &&
         (prb_idx >= cell->nof_prb / 2 - 3 && prb_idx < cell->nof_prb / 2 + 3 + (cell->nof_prb % 2))) {
       if (subframe == 0) {
         if (slot == 0) {
-          re = (nof_symbols - nof_ctrl_symbols - (has_pbch_repetition ? 3 : 2)) * SRSRAN_NRE;
-          if (has_pbch_repetition) {
-            skip_refs = false;
+          // FeMBMS dedicated carrier does not transmit PSS/SSS in CAS subframe slot 0
+          if (!cell->mbms_dedicated) {
+            re = (nof_symbols - nof_ctrl_symbols - (has_pbch_repetition ? 3 : 2)) * SRSRAN_NRE;
+            if (has_pbch_repetition) {
+              skip_refs = false;
+            }
+          } else {
+            re = (nof_symbols - nof_ctrl_symbols) * SRSRAN_NRE;
           }
         } else {
-          if (SRSRAN_CP_ISEXT(cp_)) {
-            re        = (nof_symbols - (has_pbch_repetition ? 6 : 4)) * SRSRAN_NRE;
-            skip_refs = false;
-          } else {
-            re = (nof_symbols - 4) * SRSRAN_NRE + 2 * cell->nof_ports;
-
+          // FeMBMS dedicated carrier does not transmit PBCH in CAS subframe slot 1
+          if (!cell->mbms_dedicated) {
+            if (SRSRAN_CP_ISEXT(cp_)) {
+              re        = (nof_symbols - (has_pbch_repetition ? 6 : 4)) * SRSRAN_NRE;
+              skip_refs = false;
+            } else {
+              re = (nof_symbols - 4) * SRSRAN_NRE + 2 * cell->nof_ports;
+            }
           }
         }
       } else if (subframe == 5) {
@@ -100,14 +108,18 @@ uint32_t ra_re_x_prb(const srsran_cell_t* cell, srsran_dl_sf_cfg_t* sf, uint32_t
       }
       if ((cell->nof_prb % 2) && (prb_idx == cell->nof_prb / 2 - 3 || prb_idx == cell->nof_prb / 2 + 3)) {
         if (slot == 0) {
-          re += (has_pbch_repetition ? 3 : 2) * SRSRAN_NRE / 2;
-          if (has_pbch_repetition) {
-            re -= cell->nof_ports > 2 ? 2 : cell->nof_ports;
+          if (!cell->mbms_dedicated) {
+            re += (has_pbch_repetition ? 3 : 2) * SRSRAN_NRE / 2;
+            if (has_pbch_repetition) {
+              re -= cell->nof_ports > 2 ? 2 : cell->nof_ports;
+            }
           }
         } else if (subframe == 0) {
-          re += (has_pbch_repetition ? 6 : 4) * SRSRAN_NRE / 2 - cell->nof_ports;
-          if (SRSRAN_CP_ISEXT(cp_)) {
-            re -= cell->nof_ports > 2 ? 2 : cell->nof_ports;
+          if (!cell->mbms_dedicated) {
+            re += (has_pbch_repetition ? 6 : 4) * SRSRAN_NRE / 2 - cell->nof_ports;
+            if (SRSRAN_CP_ISEXT(cp_)) {
+              re -= cell->nof_ports > 2 ? 2 : cell->nof_ports;
+            }
           }
         }
       }
@@ -452,6 +464,9 @@ void srsran_ra_dl_compute_nof_re(const srsran_cell_t* cell, srsran_dl_sf_cfg_t* 
     } else if (sf->sf_type == SRSRAN_SF_MBSFN && sf->subcarrier_spacing == SRSRAN_SCS_7KHZ5) {
       grant->nof_symb_slot[0] = SRSRAN_CP_SCS_7KHZ5_NSYMB;
       grant->nof_symb_slot[1] = SRSRAN_CP_SCS_7KHZ5_NSYMB;
+    } else if (sf->sf_type == SRSRAN_SF_MBSFN && sf->subcarrier_spacing == SRSRAN_SCS_2KHZ5) {
+      grant->nof_symb_slot[0] = SRSRAN_CP_SCS_2KHZ5_NSYMB;
+      grant->nof_symb_slot[1] = SRSRAN_CP_SCS_2KHZ5_NSYMB;
     } else {
       grant->nof_symb_slot[0] = SRSRAN_CP_NSYMB(cp_);
       grant->nof_symb_slot[1] = SRSRAN_CP_NSYMB(cp_);
@@ -698,12 +713,27 @@ uint32_t srsran_ra_dl_grant_nof_re(const srsran_cell_t* cell, srsran_dl_sf_cfg_t
   // Compute number of RE per PRB
   uint32_t nof_re = 0;
   uint32_t nof_slots = (sf->sf_type == SRSRAN_SF_MBSFN ? SRSRAN_MBSFN_NOF_SLOTS(sf->subcarrier_spacing) : 2);
+  static int diag_printed = 0;
+  int do_diag = (diag_printed < 3) && (sf->sf_type == SRSRAN_SF_NORM);
+  if (do_diag) {
+    printf("[RA_RE DIAG] sf_idx=%u cfi=%u nof_prb=%u nof_ports=%u has_pbch_rep=%d mbms_ded=%d\n",
+           sf->tti % 10, sf->cfi, cell->nof_prb, cell->nof_ports,
+           (int)cell->has_pbch_repetition_r16, (int)cell->mbms_dedicated);
+  }
   for (s = 0; s < nof_slots; s++) {
     for (j = 0; j < cell->nof_prb; j++) {
       if (grant->prb_idx[s][j]) {
-        nof_re += ra_re_x_prb(cell, sf, s, j);
+        uint32_t re_prb = ra_re_x_prb(cell, sf, s, j);
+        if (do_diag) {
+          printf("[RA_RE DIAG] slot=%u prb=%u re=%u\n", s, j, re_prb);
+        }
+        nof_re += re_prb;
       }
     }
+  }
+  if (do_diag) {
+    printf("[RA_RE DIAG] total nof_re=%u\n", nof_re);
+    diag_printed++;
   }
   return nof_re;
 }

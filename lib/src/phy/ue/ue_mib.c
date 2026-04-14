@@ -292,10 +292,17 @@ int srsran_ue_mib_sync_decode_prb(srsran_ue_mib_sync_t* q,
 
    if (srsran_ue_sync_get_sfidx(&q->ue_sync) == 0 ) {
       if (ret == 1) {
-        // We don't know at this point if the cell is MBMS dedicated, and don't have a way
-        // to limit the decoded frames to sfn%4==0 - so reset the decoder every time
-        srsran_ue_mib_reset(&q->ue_mib);
-        mib_ret = srsran_ue_mib_decode(&q->ue_mib, bch_payload, nof_tx_ports, sfn_offset);
+        bool pbch_repetition = q->ue_sync.cell.mbms_dedicated && q->ue_sync.cell.has_pbch_repetition_r16;
+        if (pbch_repetition) {
+          // With Rel-16 PBCH repetition all sf0 carry PBCH: accumulate across 4 consecutive
+          // frames for combining gain instead of resetting before every single-frame attempt.
+          mib_ret = srsran_ue_mib_decode(&q->ue_mib, bch_payload, nof_tx_ports, sfn_offset);
+        } else {
+          // Without PBCH repetition we can't distinguish CAS from MBSFN sf0 at this level,
+          // so keep the safe reset-every-frame behaviour (single-frame decode only).
+          srsran_ue_mib_reset(&q->ue_mib);
+          mib_ret = srsran_ue_mib_decode(&q->ue_mib, bch_payload, nof_tx_ports, sfn_offset);
+        }
       } else {
         DEBUG("Resetting PBCH decoder after %d frames", q->ue_mib.frame_cnt);
         srsran_ue_mib_reset(&q->ue_mib);

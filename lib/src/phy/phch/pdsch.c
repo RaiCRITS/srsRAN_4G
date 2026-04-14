@@ -83,6 +83,7 @@ static void* srsran_pdsch_decode_thread(void* arg);
 static inline bool pdsch_cp_skip_symbol(const srsran_cell_t*        cell,
                                         const srsran_pdsch_grant_t* grant,
                                         uint32_t                    sf_idx,
+                                        uint32_t                    tti,
                                         uint32_t                    s,
                                         uint32_t                    l,
                                         uint32_t                    n)
@@ -90,12 +91,16 @@ static inline bool pdsch_cp_skip_symbol(const srsran_cell_t*        cell,
   // Skip center block signals
   if ((n >= cell->nof_prb / 2 - 3 && n < cell->nof_prb / 2 + 3 + (cell->nof_prb % 2))) {
     if (cell->frame_type == SRSRAN_FDD) {
-      // FDD PSS/SSS
-      if (s == 0 && (sf_idx == 0 || sf_idx == 5) && (l >= grant->nof_symb_slot[s] - 2)) {
+      // FDD PSS/SSS — not present in FeMBMS dedicated carrier CAS subframe
+      if (s == 0 && (sf_idx == 0 || sf_idx == 5) && (l >= grant->nof_symb_slot[s] - 2) &&
+          !cell->mbms_dedicated) {
         return true;
       }
-      if (cell->mbms_dedicated && cell->nof_prb > 6 && 
-          cell->has_pbch_repetition_r16 && sf_idx == 0 &&
+      /* PBCH repetition symbols exist only in non-CAS sf0 (sfn%4 != 0).
+       * CAS sf0 (sfn%4 == 0) uses standard PBCH — these extra symbols are not present. */
+      bool is_cas_frame = !cell->mbms_dedicated || (tti / 10) % 4 == 0;
+      if (cell->mbms_dedicated && cell->nof_prb > 6 &&
+          cell->has_pbch_repetition_r16 && sf_idx == 0 && !is_cas_frame &&
           ( (s == 0 && l == 3) ||
             (s == 1 && l == 4) ||
             (s == 1 && l == 5))) {
@@ -111,8 +116,8 @@ static inline bool pdsch_cp_skip_symbol(const srsran_cell_t*        cell,
         return true;
       }
     }
-    // PBCH same in FDD and TDD
-    if (s == 1 && sf_idx == 0 && l < 4) {
+    // PBCH same in FDD and TDD — not present in FeMBMS dedicated carrier
+    if (s == 1 && sf_idx == 0 && l < 4 && !cell->mbms_dedicated) {
       return true;
     }
   }
@@ -145,12 +150,13 @@ static int srsran_pdsch_cp(const srsran_pdsch_t*       q,
                            cf_t*                       output,
                            const srsran_pdsch_grant_t* grant,
                            uint32_t                    lstart_grant,
-                           uint32_t                    sf_idx,
+                           uint32_t                    tti,
                            bool                        put)
 {
   cf_t*    in_ptr   = input;
   cf_t*    out_ptr  = output;
   uint32_t nof_refs = (q->cell.nof_ports == 1) ? 2 : 4;
+  uint32_t sf_idx   = tti % 10;
 
   // Iterate over slots
   for (uint32_t s = 0; s < SRSRAN_NOF_SLOTS_PER_SF; s++) {
@@ -169,7 +175,7 @@ static int srsran_pdsch_cp(const srsran_pdsch_t*       q,
       for (uint32_t n = 0; n < q->cell.nof_prb; n++) {
         // If this PRB is assigned
         if (grant->prb_idx[s][n]) {
-          bool skip = pdsch_cp_skip_symbol(&q->cell, grant, sf_idx, s, l, n);
+          bool skip = pdsch_cp_skip_symbol(&q->cell, grant, sf_idx, tti, s, l, n);
 
           // Get grid pointer
           if (put) {
@@ -238,9 +244,9 @@ int srsran_pdsch_put(srsran_pdsch_t*       q,
                      cf_t*                 sf_symbols,
                      srsran_pdsch_grant_t* grant,
                      uint32_t              lstart,
-                     uint32_t              subframe)
+                     uint32_t              tti)
 {
-  return srsran_pdsch_cp(q, symbols, sf_symbols, grant, lstart, subframe, true);
+  return srsran_pdsch_cp(q, symbols, sf_symbols, grant, lstart, tti, true);
 }
 
 /**
@@ -255,9 +261,9 @@ int srsran_pdsch_get(srsran_pdsch_t*       q,
                      cf_t*                 symbols,
                      srsran_pdsch_grant_t* grant,
                      uint32_t              lstart,
-                     uint32_t              subframe)
+                     uint32_t              tti)
 {
-  return srsran_pdsch_cp(q, sf_symbols, symbols, grant, lstart, subframe, false);
+  return srsran_pdsch_cp(q, sf_symbols, symbols, grant, lstart, tti, false);
 }
 
 /** Initializes the PDSCH transmitter and receiver */
@@ -684,7 +690,7 @@ static int srsran_pdsch_codeword_decode(srsran_pdsch_t*     q,
 
   if (softbuffer && data && ack && cfg->grant.tb[tb_idx].nof_bits && cfg->grant.nof_re) {
     INFO("Decoding PDSCH SF: %d (CW%d -> TB%d), Mod %s, NofBits: %d, NofSymbols: %d, NofBitsE: %d, rv_idx: %d",
-         sf->tti % 10,
+         sf->tti,
          codeword_idx,
          tb_idx,
          srsran_mod_string(mcs->mod),
@@ -826,7 +832,7 @@ int srsran_pdsch_decode(srsran_pdsch_t*        q,
     float noise_estimate = cfg->decoder_type == SRSRAN_MIMO_DECODER_ZF ? 0 : channel->noise_estimate;
 
     INFO("Decoding PDSCH SF: %d, RNTI: 0x%x, NofSymbols: %d, C_prb=%d, mod=%s, nof_layers=%d, nof_tb=%d",
-         sf->tti % 10,
+         sf->tti,
          cfg->rnti,
          cfg->grant.nof_re,
          cfg->grant.nof_prb,
@@ -837,14 +843,14 @@ int srsran_pdsch_decode(srsran_pdsch_t*        q,
     // Extract Symbols and Channel Estimates
     uint32_t lstart = SRSRAN_NOF_CTRL_SYMBOLS(q->cell, sf->cfi);
     for (int j = 0; j < q->nof_rx_antennas; j++) {
-      int n = srsran_pdsch_get(q, sf_symbols[j], q->symbols[j], &cfg->grant, lstart, sf->tti % 10);
+      int n = srsran_pdsch_get(q, sf_symbols[j], q->symbols[j], &cfg->grant, lstart, sf->tti);
       if (n != cfg->grant.nof_re) {
         ERROR("Error expecting %d symbols but got %d", cfg->grant.nof_re, n);
         return SRSRAN_ERROR;
       }
 
       for (i = 0; i < q->cell.nof_ports; i++) {
-        n = srsran_pdsch_get(q, channel->ce[i][j], q->ce[i][j], &cfg->grant, lstart, sf->tti % 10);
+        n = srsran_pdsch_get(q, channel->ce[i][j], q->ce[i][j], &cfg->grant, lstart, sf->tti);
         if (n != cfg->grant.nof_re) {
           ERROR("Error expecting %d symbols but got %d", cfg->grant.nof_re, n);
           return SRSRAN_ERROR;
@@ -985,7 +991,7 @@ static int srsran_pdsch_codeword_encode(srsran_pdsch_t*         q,
   if (cfg->grant.tb[tb_idx].enabled) {
     if (cfg->rnti != SRSRAN_SIRNTI) {
       INFO("Encoding PDSCH SF: %d (TB%d -> CW%d), Mod %s, NofBits: %d, NofSymbols: %d, NofBitsE: %d, rv_idx: %d",
-           sf->tti % 10,
+           sf->tti,
            tb_idx,
            codeword_idx,
            srsran_mod_string(mcs->mod),
@@ -1079,7 +1085,7 @@ int srsran_pdsch_encode(srsran_pdsch_t*     q,
 
     if (cfg->rnti != SRSRAN_SIRNTI) {
       INFO("Encoding PDSCH SF: %d rho_a=%f, nof_ports=%d, nof_layers=%d, nof_tb=%d, pmi=%d, tx_scheme=%s",
-           sf->tti % 10,
+           sf->tti,
            rho_a,
            q->cell.nof_ports,
            cfg->grant.nof_layers,
@@ -1133,7 +1139,7 @@ int srsran_pdsch_encode(srsran_pdsch_t*     q,
     /* mapping to resource elements */
     uint32_t lstart = SRSRAN_NOF_CTRL_SYMBOLS(q->cell, sf->cfi);
     for (i = 0; i < q->cell.nof_ports; i++) {
-      srsran_pdsch_put(q, q->symbols[i], sf_symbols[i], &cfg->grant, lstart, sf->tti % 10);
+      srsran_pdsch_put(q, q->symbols[i], sf_symbols[i], &cfg->grant, lstart, sf->tti);
     }
 
     if (cfg->meas_time_en) {

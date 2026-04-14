@@ -1424,7 +1424,7 @@ void srsran_dci_cfg_set_common_ss(srsran_dci_cfg_t* cfg)
 
 int srsran_dci_location_set(srsran_dci_location_t* c, uint32_t L, uint32_t nCCE)
 {
-  if (L <= 3) {
+  if (L <= 4) {
     c->L = L;
   } else {
     ERROR("Invalid L %d", L);
