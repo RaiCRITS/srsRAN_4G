@@ -334,7 +334,7 @@ int srsran_pmch_decode(srsran_pmch_t*         q,
                                     q->nof_rx_antennas,
                                     cfg->pdsch_cfg.grant.nof_re,
                                     1.0f,
-                                    1.0f);
+                                    channel->noise_estimate);
                                     //channel->noise_estimate);
 
     if (SRSRAN_VERBOSE_ISDEBUG())
@@ -356,7 +356,7 @@ int srsran_pmch_decode(srsran_pmch_t*         q,
      * The MAX-log-MAP algorithm used in turbo decoding is unsensitive to SNR estimation,
      * thus we don't need tot set it in thde LLRs normalization
      */
-    srsran_demod_soft_demodulate_s(cfg->pdsch_cfg.grant.tb[0].mod, q->d, q->e, cfg->pdsch_cfg.grant.nof_re, q->ce[0][0]);
+    srsran_demod_soft_demodulate_s(cfg->pdsch_cfg.grant.tb[0].mod, q->d, q->e, cfg->pdsch_cfg.grant.nof_re, cfg->ce_enable ? q->ce[0][0] : NULL);
 
     /* descramble */
     srsran_scrambling_s_offset(&q->seqs[cfg->area_id]->seq[sf->tti % 10], q->e, 0, cfg->pdsch_cfg.grant.tb[0].nof_bits);

@@ -727,6 +727,10 @@ static void demod_64qam_lte_s_sse(const cf_t* symbols, int16_t* llr, int nsymbol
   _mm_set_epi8(0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 7, 6, 5, 4, 0xff, 0xff, 0xff, 0xff);
   __m128i shuffle_abs2_3 = _mm_set_epi8(15, 14, 13, 12, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 11, 10, 9, 8);
 
+  __m128i  offseta_c = _mm_set1_epi16(4 * SCALE_SHORT_CONV_QAM64 / sqrtf(42));
+  __m128i  offsetb_c = _mm_set1_epi16(2 * SCALE_SHORT_CONV_QAM64 / sqrtf(42));
+
+  if (ce != NULL) {
   __m128   norm = _mm_set1_ps(0.00143);
   float*   cePtr = (float*)ce;
   __m128   ce1, ce2, ce2_fin, ce1_fin;
@@ -796,23 +800,65 @@ static void demod_64qam_lte_s_sse(const cf_t* symbols, int16_t* llr, int nsymbol
      _mm_store_si128(resultPtr, _mm_or_si128(_mm_or_si128(result31, result32), result33));
      resultPtr++;
   }
+  } else {
+   for (int i = 0; i < nsymbols / 4; i++) {
+     symbol1 = _mm_load_ps(symbolsPtr);
+     symbolsPtr += 4;
+     symbol2 = _mm_load_ps(symbolsPtr);
+     symbolsPtr += 4;
+
+     symbol_i1 = _mm_cvtps_epi32(_mm_mul_ps(symbol1, scale_v));
+     symbol_i2 = _mm_cvtps_epi32(_mm_mul_ps(symbol2, scale_v));
+     symbol_i  = _mm_packs_epi32(symbol_i1, symbol_i2);
+
+     symbol_abs  = _mm_abs_epi16(symbol_i);
+     symbol_abs  = _mm_sub_epi16(symbol_abs, offseta_c);
+     symbol_abs2 = _mm_sub_epi16(_mm_abs_epi16(symbol_abs), offsetb_c);
+
+     result11 = _mm_shuffle_epi8(symbol_i, shuffle_negated_1);
+     result12 = _mm_shuffle_epi8(symbol_abs, shuffle_abs_1);
+     result13 = _mm_shuffle_epi8(symbol_abs2, shuffle_abs2_1);
+
+     result21 = _mm_shuffle_epi8(symbol_i, shuffle_negated_2);
+     result22 = _mm_shuffle_epi8(symbol_abs, shuffle_abs_2);
+     result23 = _mm_shuffle_epi8(symbol_abs2, shuffle_abs2_2);
+
+     result31 = _mm_shuffle_epi8(symbol_i, shuffle_negated_3);
+     result32 = _mm_shuffle_epi8(symbol_abs, shuffle_abs_3);
+     result33 = _mm_shuffle_epi8(symbol_abs2, shuffle_abs2_3);
+
+     _mm_store_si128(resultPtr, _mm_or_si128(_mm_or_si128(result11, result12), result13));
+     resultPtr++;
+     _mm_store_si128(resultPtr, _mm_or_si128(_mm_or_si128(result21, result22), result23));
+     resultPtr++;
+     _mm_store_si128(resultPtr, _mm_or_si128(_mm_or_si128(result31, result32), result33));
+     resultPtr++;
+   }
+  }
 
   const int16_t threshold1 = 4 * SCALE_SHORT_CONV_QAM64 / sqrtf(42);
   const int16_t threshold2 = 2 * SCALE_SHORT_CONV_QAM64 / sqrtf(42);
-
 
   for (int i = 4 * (nsymbols / 4); i < nsymbols; i++) {
     int16_t yre = SCALE_SHORT_CONV_QAM64 * crealf(symbols[i]);
     int16_t yim = SCALE_SHORT_CONV_QAM64 * cimagf(symbols[i]);
 
-    short ce_mag = (short)(ce[i]*conj(ce[i]))*0.00143;
-
-    llr[6 * i + 0] = -yre*ce_mag;
-    llr[6 * i + 1] = -yim*ce_mag;
-    llr[6 * i + 2] = (int16_t)abs(yre)*ce_mag - threshold1*ce_mag;
-    llr[6 * i + 3] = (int16_t)abs(yim)*ce_mag - threshold1*ce_mag;
-    llr[6 * i + 4] = (int16_t)abs(llr[6 * i + 2]) - threshold2*ce_mag;
-    llr[6 * i + 5] = (int16_t)abs(llr[6 * i + 3]) - threshold2*ce_mag;
+    if (ce != NULL) {
+      float ce_mag = crealf(ce[i] * conj(ce[i])) * 0.00143f;
+      llr[6 * i + 0] = (int16_t)(-yre * ce_mag);
+      llr[6 * i + 1] = (int16_t)(-yim * ce_mag);
+      llr[6 * i + 2] = (int16_t)(abs(yre) * ce_mag - threshold1 * ce_mag);
+      llr[6 * i + 3] = (int16_t)(abs(yim) * ce_mag - threshold1 * ce_mag);
+      llr[6 * i + 4] = (int16_t)(abs(llr[6 * i + 2]) - threshold2 * ce_mag);
+      llr[6 * i + 5] = (int16_t)(abs(llr[6 * i + 3]) - threshold2 * ce_mag);
+    } else {
+      llr[6 * i + 0] = -yre;
+      llr[6 * i + 1] = -yim;
+      llr[6 * i + 2] = (int16_t)abs(yre) - threshold1;
+      llr[6 * i + 3] = (int16_t)abs(yim) - threshold1;
+      llr[6 * i + 4] = (int16_t)abs(llr[6 * i + 2]) - threshold2;
+      llr[6 * i + 5] = (int16_t)abs(llr[6 * i + 3]) - threshold2;
+    }
   }
 }
 

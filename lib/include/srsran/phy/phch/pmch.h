@@ -50,6 +50,7 @@ typedef struct {
 typedef struct SRSRAN_API {
   srsran_pdsch_cfg_t pdsch_cfg;
   uint16_t           area_id;
+  bool               ce_enable; // Enables the CE multiplication in demod_soft. Unrelated to pdsch_cfg.csi_enable.
 } srsran_pmch_cfg_t;
 
 /* PMCH object */
